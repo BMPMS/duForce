@@ -1,0 +1,45 @@
+{
+  "name": "dupardee",
+  "version": "1.0.0",
+  "description": "",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build && node ./scripts/copy-assets.js",
+    "preview": "vite preview",
+    "autobuild": "npm run build --watch",
+    "lint": "npx eslint ./",
+    "lint:fix": "npm run lint -- --fix",
+    "prettier": "npx prettier ./ --check",
+    "prettier:fix": "npm run prettier -- --write",
+    "format": "npm run prettier:fix && npm run lint:fix"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@pixi-essentials/cull": "^2.0.0",
+    "d3": "^7.8.5",
+    "graphology": "^0.25.4",
+    "graphology-shortest-path": "^2.0.2",
+    "graphology-traversal": "^0.3.1",
+    "pixi-viewport": "^5.0.1",
+    "pixi.js": "^7.2.4"
+  },
+  "devDependencies": {
+    "cors": "^2.8.5",
+    "eslint": "^8.50.0",
+    "eslint-config-prettier": "^9.0.0",
+    "express": "^4.18.2",
+    "fs-extra": "^11.2.0",
+    "prettier": "^3.0.3",
+    "serverless-http": "^3.2.0",
+    "sqlite3": "^5.1.6",
+    "vite": "^4.4.9"
+  },
+  "prettier": {
+    "trailingComma": "es5",
+    "tabWidth": 2,
+    "printWidth": 1000,
+    "singleQuote": false
+  }
+}

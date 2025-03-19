@@ -1,0 +1,376 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link href="https://fonts.googleapis.com/css?family=Lato:300,400,700&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css?family=Montserrat:400,800&display=swap" rel="stylesheet" />
+    <script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script>
+    <script async defer crossorigin="anonymous" src="https://connect.facebook.net/en_GB/sdk.js#xfbml=1&version=v18.0" nonce="A8mSyCnv"></script>
+    <title>Graph Application</title>
+    <style>
+      :root {
+        --main-bg-color: black;
+        --text-color: white;
+        --text-hover-color: #ddd;
+      }
+
+      body {
+        padding: 0px;
+        margin: 0px;
+        background-color: var(--main-bg-color);
+        font-family: "Lato", sans-serif;
+        position: relative;
+        overflow: hidden;
+      }
+
+      h2 {
+        font-family: "Montserrat", sans-serif;
+        padding: 0px 5px;
+        margin: 0px;
+        color: var(--text-color);
+      }
+
+      h3 {
+        font-family: "Montserrat", sans-serif;
+        font-size: 0.9rem;
+        padding: 0px 5px;
+        margin: 0px;
+      }
+
+      p {
+        font-family: "Lato", sans-serif;
+        font-size: 0.7rem;
+        padding: 0px 5px;
+        margin: 0px;
+        color: var(--text-color);
+      }
+
+      span {
+        font-family: "Lato", sans-serif;
+        font-size: 0.7em;
+      }
+
+      .message {
+        position: absolute;
+        top: 90px;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        text-align: center;
+        visibility: hidden;
+        z-index: 11;
+      }
+
+      /* Style button panel and each button */
+      #buttonPanel {
+        position: absolute;
+        top: 5px;
+        left: 5px;
+        z-index: 10;
+      }
+
+      .button, select {
+        font-family: "Montserrat", sans-serif;
+        padding: 6px 16px;
+        margin: 5px;
+        border: 2px solid var(--text-color);
+        background-color: var(--main-bg-color);
+        color: var(--text-color);
+        cursor: pointer;
+        font-size: 12px;
+      }
+
+      .button1, .default-dd {
+        font-family: "Montserrat", sans-serif;
+        padding: 6px 16px;
+        margin: 5px;
+        border: 2px solid var(--main-bg-color);
+        background-color: var(--main-bg-color);
+        color: var(--text-color);
+        cursor: pointer;
+        font-size: 12px;
+      }
+
+      .clicked {
+        background-color: var(--text-color);
+        color: var(--main-bg-color)
+      }
+
+      /* Style search box and its contents */
+      #search-container {
+        /* position: absolute;
+        display: flex;
+        top: 0px;
+        right: 20px; */
+        position: absolute;
+        top: 105px;
+        width: 254px;
+        margin: 5px;
+        position: relative;
+        z-index: 10;
+      }
+
+      #search-input {
+        font-family: "Lato", sans-serif;
+        width: 230px;
+        padding: 10px;
+        border: 2px solid var(--text-color);
+        background-color: var(--main-bg-color);
+        color: var(--text-color);
+        font-size: 16px;
+      }
+
+      #suggestions-container {
+        /* position: absolute;
+        top: 100%;
+        left: 0;
+        width: 100%; */
+        width: 254px;
+        border: 1px solid var(--text-color);
+        background-color: var(--text-color);
+        color: var(--main-bg-color);
+        display: none;
+        max-height: 200px;
+        overflow-y: auto;
+        position: relative;
+        z-index: 99;
+      }
+
+      .suggestion {
+        padding: 10px;
+        cursor: pointer;
+      }
+
+      .suggestion:hover {
+        background-color: var(--text-hover-color);
+      }
+
+      #reset-search {
+        position: absolute;
+        right: 10px;
+        top: 0px;
+        padding: 8px 0px;
+        cursor: pointer;
+        display: none;
+      }
+
+      /* Style the tabbed component */
+      #tabbed-component {
+        position: absolute;
+        right: 20px;
+        top: 20px;
+        background-color: var(--main-bg-color);
+        color: var(--text-color);
+        border: 1px solid var(--text-color);
+        padding: 10px;
+        width: 300px;
+        min-width: 300px;
+        height: calc(100vh - 100px);
+        z-index: 99;
+      }
+      
+      #view {
+        height: calc(100vh - 120px);
+      }
+
+      .tab {
+        overflow: hidden;
+        border: 1px solid var(--text-color);
+        background-color: var(--main-bg-color);
+      }
+
+      .tab button {
+        background-color: inherit;
+        color: var(--text-color);
+        float: left;
+        border: none;
+        outline: none;
+        cursor: pointer;
+        padding: 14px 16px;
+        transition: 0.3s;
+      }
+
+      .tab button:hover {
+        background-color: var(--text-hover-color);
+      }
+
+      .tab button.active {
+        background-color: var(--text-color);
+        color: var(--main-bg-color);
+      }
+
+      .tabcontent {
+        display: none;
+        margin: 20px 10px;
+        border-top: none;
+      }
+
+      /* Link to show tabbed component */
+      #showInfo {
+        position: absolute;
+        top: 35px;
+        right: 20px;
+        padding: 8px 0px;
+        cursor: pointer;
+        font-size: 15px;
+      }
+
+      /* Icon button to hide tabbed component */
+      #closeButton {
+        position: absolute;
+        top: 0;
+        right: 0;
+        background: none;
+        border: none;
+        cursor: pointer;
+        margin-top: 19px;
+      }
+
+      .hidden {
+        display: none;
+      }
+
+      .btn-o {
+        width: 100% !important;
+      }
+
+      canvas {
+        position: absolute;
+        top: 0;
+        left: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="fb-root"></div>
+
+    <script type="module" src="./main.js"></script>
+    <div class="button-panel" id="buttonPanel"></div>
+    <div id="search-container">
+      <input type="text" id="search-input" placeholder="Search for variables" />
+      <div id="reset-search">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+          <path fill="white" d="M19.9 5.1a.996.996 0 0 0-1.41 0L12 10.59 6.51 5.1a.996.996 0 1 0-1.41 1.41L10.59 12 5.1 17.49a.996.996 0 1 0 1.41 1.41L12 13.41l5.49 5.49a.996.996 0 1 0 1.41-1.41L13.41 12l5.49-5.49a.996.996 0 0 0 0-1.4z" />
+        </svg>
+      </div>
+      <div id="suggestions-container"></div>
+    </div>
+    <div id="app"></div>
+    <p id="showInfo">Show info pane</p>
+    <div id="tabbed-component">
+      <button id="closeButton">
+        <svg xmlns="http://www.w3.org/2000/svg" width="44" height="44" fill="#fff" viewBox="0 0 44 44">
+          <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
+        </svg>
+      </button>
+
+      <!-- Tab links -->
+      <div class="tab">
+        <button class="tablinks" onclick="openTab(event, 'Info')">
+          <h3>Info</h3>
+        </button>
+        <button class="tablinks active" onclick="openTab(event, 'List')">
+          <h3>List</h3>
+        </button>
+        <button class="tablinks" onclick="openTab(event, 'Share')">
+          <h3>Share</h3>
+        </button>
+      </div>
+
+      <!-- Tab content -->
+      <div id="Info" class="tabcontent">
+        <h3>Economic Model</h3>
+      </div>
+
+      <div id="List" class="tabcontent">
+        <div id="view"></div>
+      </div>
+
+      <div id="Share" class="tabcontent">
+        <div class="fb-share-button" data-layout="button_count" data-size="small"></div>
+      </div>
+    </div>
+    <!-- <div id="action-notes">
+      <p>Double click any node to expand/collapse children nodes</p>
+      <p>Click on any two variable nodes to find the shortest path between them</p>
+      <p>When the 'Show neighbors' button is activated, hover a node to show connections up to 2 degrees away.</p>
+    </div> -->
+    <script>
+      document.getElementById("List").style.display = "block";
+
+      function openTab(evt, name) {
+        // Declare all variables
+        var i, tabcontent, tablinks;
+
+        // Get all elements with class="tabcontent" and hide them
+        tabcontent = document.getElementsByClassName("tabcontent");
+        for (i = 0; i < tabcontent.length; i++) {
+          tabcontent[i].style.display = "none";
+        }
+
+        // Get all elements with class="tablinks" and remove the class "active"
+        tablinks = document.getElementsByClassName("tablinks");
+        for (i = 0; i < tablinks.length; i++) {
+          tablinks[i].className = tablinks[i].className.replace(" active", "");
+        }
+
+        // Show the current tab, and add an "active" class to the button that opened the tab
+        document.getElementById(name).style.display = "block";
+        evt.currentTarget.className += " active";
+
+        if (name === "Share") {
+          var width = 0;
+          var iframes = document.querySelectorAll("#Share iframe");
+
+          iframes.forEach(function (iframe) {
+            if (width < iframe.offsetWidth) {
+              width = iframe.offsetWidth;
+            }
+          });
+
+          if (width < 2) {
+            var tweetButton = document.createElement("a");
+            tweetButton.href = "https://twitter.com/share";
+            tweetButton.className = "twitter-share-button";
+            tweetButton.setAttribute("data-url", window.location.href);
+            tweetButton.setAttribute("data-text", "Snapshot of IFS Network");
+            tweetButton.textContent = "Tweet";
+
+            document.querySelector("#Share").appendChild(tweetButton);
+            twttr.widgets.load();
+
+            var fbButton = document.createElement("a");
+            fbButton.href = "https://www.facebook.com/sharer/sharer.php?u=https%3A%2F%2Fdevelopers.facebook.com%2Fdocs%2Fplugins%2F&amp;src=sdkpreparse";
+            fbButton.className = "fb-xfbml-parse-ignore";
+            fbButton.textContent = "Share on Facebook";
+
+            document.querySelector(".fb-share-button").setAttribute("data-href", window.location.href);
+            document.querySelector(".fb-share-button").appendChild(fbButton);
+          }
+        }
+      }
+
+      const closeButton = document.getElementById("closeButton");
+      const showInfo = document.getElementById("showInfo");
+      const tabbedComponent = document.getElementById("tabbed-component");
+
+      if (window.innerWidth < 1000) {
+        tabbedComponent.classList.add("hidden");
+        showInfo.classList.remove("hidden");
+      } else {
+        tabbedComponent.classList.remove("hidden");
+        showInfo.classList.add("hidden");
+      }
+
+      closeButton.addEventListener("click", function () {
+        tabbedComponent.classList.add("hidden");
+        showInfo.classList.remove("hidden");
+      });
+
+      showInfo.addEventListener("click", function () {
+        tabbedComponent.classList.remove("hidden");
+        showInfo.classList.add("hidden");
+      });
+    </script>
+  </body>
+</html>
