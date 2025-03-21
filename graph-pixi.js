@@ -248,7 +248,9 @@ export default async function ForceGraph(
         .radius((d) => (d.type === "tier1" || d.type === "tier2" ? d.radius * 2 : d.radius))
         .iterations(3)
     )
-    .force("cluster", forceCluster().strength(0.45)); // cluster all nodes belonging to the same submodule.
+    .force("cluster", forceCluster().strength(0.45)) // cluster all nodes belonging to the same submodule.
+
+  simulation.stop();
 
   // Create PIXI application
   const app = new PIXI.Application({
@@ -608,20 +610,27 @@ export default async function ForceGraph(
       console.log("reheat graph");
       // Note: don't set such a high charge as new nodes seem to get pushed far away from their original position
       // distanceMin is the minimum distance between nodes over which this force is considered. Helps to void an infinitely-strong force if two nodes are exactly coincident
-      simulation.force(
-        "charge",
-        d3
-          .forceManyBody()
-          .strength(expandedAll ? -100 : -150)
-          .distanceMin(100)
-      );
+    //  simulation.force(
+     //   "charge",
+    //    d3
+    //      .forceManyBody()
+    //      .strength(expandedAll ? -100 : -150)
+    //      .distanceMin(100)
+    //  );
 
-      simulation
-        .alphaTarget(0.2)
-        .alphaDecay(expandedAll ? 0.5 : 0.3) // increase alphaDecay value to cool down a graph more quickly
-        .restart();
+      simulation.stop();
+      simulation.nodes([]).force("link").links([]);
 
-      simulation.on("tick", () => updatePositions());
+      simulation.nodes(showEle.nodes).force("link").links(showEle.links);
+      simulation.alphaTarget(0.1).restart();
+      simulation.tick(Math.ceil(Math.log(simulation.alphaMin()) / Math.log(1 - simulation.alphaDecay())));
+    //  simulation
+     //   .alphaTarget(0.2)
+     //   .alphaDecay(expandedAll ? 0.5 : 0.3) // increase alphaDecay value to cool down a graph more quickly
+     //   .restart();
+
+      //simulation.on("tick", () => updatePositions());
+      updatePositions();
     } else {
       console.log("run static graph layout");
       simulation.force("charge", d3.forceManyBody().strength(expandedAll ? -100 : -250));
@@ -762,6 +771,7 @@ export default async function ForceGraph(
 
     // Update coordinates of all PIXI elements on screen based on force simulation calculations
     function updatePositions() {
+
       for (let i = 0; i < showEle.nodes.length; i++) {
         let node = showEle.nodes[i];
         const nodeGfx = nodeDataToNodeGfx.get(node);
@@ -1381,7 +1391,7 @@ export default async function ForceGraph(
     message.select(".shortestPath-status").html("");
     message.style("visibility", "hidden");
 
-    tooltip.style("visibility", "hidden");
+    tooltip.style("visibility", "hidden").attr("pointer-events","none");
 
     document.querySelectorAll('input[type="checkbox"]').forEach((e) => (e.checked = false)); // uncheck all the checkboxes from tree
     document.querySelectorAll('input[type="checkbox"]').forEach((e) => (e.disabled = false)); // activate all the checkboxes from tree (ie. checkboxes are clickable again)
