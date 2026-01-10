@@ -48,7 +48,8 @@ const generateParameterData = (dataNodes, dataLinks) => {
     const sourceLinks = links.filter((f) => f.source === node.id).length;
     const targetLinks = links.filter((f) => f.target === node.id).length;
     node.allLinksCount = sourceLinks + targetLinks;
-    node.linkCount = Math.sqrt((targetLinks + 1) * (sourceLinks + 1));
+   // node.linkFormulaCount = Math.sqrt((targetLinks + 1) * (sourceLinks + 1));
+    node.linkCount =  Math.sqrt((targetLinks + 1) * (sourceLinks + 1));
     acc.push(node);
     return acc;
   }, [])

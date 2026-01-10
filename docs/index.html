@@ -9,8 +9,8 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/js/all.min.js" crossorigin="anonymous"></script>
     
     <title>Graph Application</title>
-    <script type="module" crossorigin src="/duForce/assets/index-208c4ad2.js"></script>
-    <link rel="stylesheet" href="/duForce/assets/index-14c64213.css">
+    <script type="module" crossorigin src="/duForce/assets/index-c49634ec.js"></script>
+    <link rel="stylesheet" href="/duForce/assets/index-b62eb2b0.css">
   </head>
   <body>
     <!-- tooltipCount + info message (top left + middle if needed) -->
@@ -67,6 +67,18 @@
         </div>
       </div>
     </div>
+    <!-- helpinfo panel, fixed bottom right above zoom buttons, only available on request -->
+    <div id="helpModalOverlay"></div>
+    <div id="helpInformationPanel"></div>
+    <div id="helpInfoButtonContainer" class="infoButtonContainer">
+      <button id="helpInfoCloseButton" class="infoCloseButton">x</button>
+    </div>
+    <!-- constantOptions panel, fixed bottom right above zoom buttons, only available on request -->
+    <div id="constantOptionsModalOverlay"></div>
+    <div id="constantOptionsPanel"></div>
+    <div id="constantOptionsButtonContainer" class="infoButtonContainer">
+      <button id="constantOptionsCloseButton" class="CloseButton">x</button>
+    </div>
     <div class="tooltip"></div>
     <div class="tooltipExtra"></div>
     <!-- main app container -->
@@ -120,20 +132,8 @@
           <p class="viewButton" id="showInfo">Show interactive menu</p>
           <p class="viewButton" id="hideInfo">Hide interactive menu</p>
         </div>
-        <!-- helpinfo panel, fixed bottom right above zoom buttons, only available on request -->
-      <div id="helpModalOverlay"></div>
-      <div id="helpInformationPanel"></div>
-      <div id="helpInfoButtonContainer" class="infoButtonContainer">
-        <button id="helpInfoCloseButton" class="infoCloseButton">x</button>
-      </div>
-      
 
-      <!-- constantOptions panel, fixed bottom right above zoom buttons, only available on request -->
-      <div id="constantOptionsModalOverlay"></div>
-      <div id="constantOptionsPanel"></div>
-      <div id="constantOptionsButtonContainer" class="infoButtonContainer">
-        <button id="constantOptionsCloseButton" class="CloseButton">x</button>
-      </div>
+      
       
       <!-- container far right -->
       <div id="collapsibleMenuContainer">

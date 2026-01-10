@@ -145,7 +145,7 @@ label {
     background-color: black;
     color: white;
     border: 0.075rem solid white;
-    z-index: 999999;
+    z-index: 1500;
     pointer-events:all;
 }
 /* parameter selection */
@@ -664,7 +664,7 @@ input[type="range"] {
 #helpInformationPanel, #constantOptionsPanel {
     background-color: black;
     color: white;
-    z-index: 1000;
+    z-index: 3000;
     width: 60vw;
     height: 80vh;
     padding: 1rem;
@@ -692,7 +692,7 @@ input[type="range"] {
     width: 100vw;
     height: 100vh;
     background: rgba(0,0,0,0.5);
-    z-index: 999;
+    z-index: 2500;
     visibility: hidden;
     opacity: 0;
     transition: opacity 0.2s ease;
@@ -739,6 +739,10 @@ input[type="range"] {
     align-items: center;      /* vertically align label, slider, value */
     gap: 5px;
     white-space: nowrap;      /* prevent labels from wrapping */
+}
+
+.switch {
+    font-size: 0.8rem;
 }
 
 .slider-group label,

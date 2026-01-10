@@ -448,6 +448,7 @@ export default function VariableTree(data) {
 
     });
 
+
   const showParameters = d3.select("#viewParams");
 
   showParameters.on("change",(event) => {
