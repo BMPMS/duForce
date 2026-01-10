@@ -31,7 +31,7 @@ export const config = {
   currentTreeData: {}, // current tree expansion status
   tier1And2Mapper: {},// used when collapsing/expanding tree
   // set after initial default load
-  defaultNodePositions:{"withParameters":[],"withoutParameters":[]},
+  defaultNodePositions:[],
   // arrays used for selected nodes (notDefault for NN + SP layouts)
   selectedNodeNames: [],
   notDefaultSelectedNodeNames: [],

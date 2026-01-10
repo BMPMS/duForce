@@ -98,7 +98,6 @@ export default async function ForceGraph(
   const SIMULATION_TICK_TIME = config.simulationTickTime;
   const LABEL_FONT_BASE_REM = config.labelRem;
   let PARAMETER_CLUSTER_STRENGTH = config.parameterClusterStrength;
-  const parameterStatus =  config.showParameters ? "withParameters":"withoutParameters";
 
   if (!nodes) return;
   const windowBaseUrl = window.location.href.split("?")[0];
@@ -108,9 +107,9 @@ export default async function ForceGraph(
   const showEle = { nodes, links};
 
   // set scales
-  const radiusMax = config.graphDataType === "parameter" ?
+  let radiusMax = config.graphDataType === "parameter" ?
     d3.max(nodes, (d) => d.linkCount) :
-    d3.max(showEle.nodes, (d) => d.data.parameterCount)
+    d3.max(showEle.nodes, (d) => d.data.linkCount)
 
   const nodeRadiusScale = d3
     .scaleSqrt()
@@ -136,7 +135,7 @@ export default async function ForceGraph(
       return acc;
     },[])
   }
-  // add additional node variables
+    // add additional node variables
   showEle.nodes = showEle.nodes.reduce((acc, node) => {
     const subModule = node.subModule ? node.subModule : node.data.subModule;
     const matchingSubmodule = subModulePositions.find((f) => f.name === subModule);
@@ -320,8 +319,6 @@ export default async function ForceGraph(
         .attr("dy",getNodeLabelDy)
         .attr("font-size",getNodeLabelSize)
         .style("display",getNodeLabelDisplay);
-
-
     });
 
   baseSvg.call(zoom).on("dblclick.zoom", null);
@@ -373,11 +370,13 @@ export default async function ForceGraph(
   };
   const resetDefaultNodes = () => {
     // uses positions recorded from initial default build to reset the positions
-    const previousPositions = config.defaultNodePositions[parameterStatus];
+    const previousPositions = config.defaultNodePositions;
     showEle.nodes.map((m) => {
       const previousNode = previousPositions[m.id];
-      m.x = previousNode.x;
-      m.y = previousNode.y;
+      if(previousNode){
+        m.x = previousNode.x;
+        m.y = previousNode.y;
+      }
     })
 
     showEle.links.map((m) => {
@@ -403,7 +402,7 @@ export default async function ForceGraph(
       })
   }
 
-  if (!initial && !(config.currentLayout === "default" && config.defaultNodePositions[parameterStatus].length === 0)) {
+  if (!initial && !(config.currentLayout === "default" && config.defaultNodePositions.length === 0)) {
     if (config.currentLayout === "default") {
       resetDefaultNodes();
       simulation.nodes([]).force("link").links([]);
@@ -430,9 +429,7 @@ export default async function ForceGraph(
         acc[node.id] = { x: node.x, y: node.y };
         return acc
       }, {})
-      const currentNodePositions = config.defaultNodePositions;
-      currentNodePositions[parameterStatus] = defaultNodePositions;
-      config.setDefaultNodePositions(currentNodePositions)
+      config.setDefaultNodePositions(defaultNodePositions)
     }
     updatePositions(true );
   }
@@ -1257,8 +1254,7 @@ export default async function ForceGraph(
     const isNormalClick = (event) =>
       !(event.shiftKey || event.altKey || event.ctrlKey || event.metaKey);
 
-    console.log('rendering nodes')
-    // append chartNodes to nodesGroup and define attributes
+     // append chartNodes to nodesGroup and define attributes
     const nodesGroup = svg.select(".nodeGroup")
       .selectAll(".nodesGroup")
       .data(chartNodes, (d) => d.id)
@@ -1503,7 +1499,7 @@ export default async function ForceGraph(
     let y = 0;
     let z = 0;
     for (const d of nodes) {
-      let k = d.radius ** 4;
+      let k = d.radius ** 2;
       x += d.x * k
       y += d.y * k;
       z += k;
@@ -1976,7 +1972,7 @@ export default async function ForceGraph(
     const constantOptionsButton = d3.select("#constantOptions");
 
     constantOptionsButton
-      .style("display",SHOW_SETTINGS ? "block" : "none")
+      .style("display",SHOW_SETTINGS && config.graphDataType === "parameter" ? "block" : "none")
       .on("click", () => {
         const panel = document.getElementById('constantOptionsPanel');
         const overlay = document.getElementById('constantOptionsModalOverlay');
@@ -2000,9 +1996,6 @@ export default async function ForceGraph(
         config.setLabelRem(+value);
       });
     }
-
-
-
 
     const sliderRMin = document.getElementById('sliderRMin');
     const displayRMin = document.getElementById('valueDisplayRMin');
