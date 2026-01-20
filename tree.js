@@ -11,32 +11,11 @@ const getGraphData = () => {
   return {nodes: config.hierarchyData["subModuleNodes"],links: []};
 }
 
-const getSubModulePositions = (width, height) => {
-  const subModulesByLeaveCount = config.hierarchyData.subModuleNodes.reduce((acc, entry) => {
+const getSubModulePositions = () => {
+
+  const subModulePositions =  config.hierarchyData.subModuleNames.reduce((acc, entry,index) => {
     acc.push({
-      name: entry.id,
-      value: entry.leaves().length
-    })
-    return acc;
-  },[]);
-
-  const root = d3
-    .hierarchy({ name: "root", children: subModulesByLeaveCount })
-    .sum((s) => s.value);
-
-  const treemapLayout = d3.treemap()
-    .size([width, height])
-
-  treemapLayout(root);
-
-  // applying a basic jitter function so it doesn't appear totally aligned
-  const jitter = (value, amount = 50) => value + (Math.random() * 2 - 1) * amount;
-
-  const subModulePositions =  root.children.reduce((acc, entry,index) => {
-    acc.push({
-      name: entry.data.name,
-      x: jitter(entry.x0 + (entry.x1 - entry.x0)),
-      y: jitter(entry.y0 + (entry.y1 - entry.y0)),
+      name: entry,
       fill: COLOR_SCALE_RANGE[index]
     })
     return acc;
@@ -47,6 +26,7 @@ const getSubModulePositions = (width, height) => {
 export const renderGraph = (initial) => {
 
   const graphData = getGraphData();
+
  const subModulePositions = getSubModulePositions(window.innerWidth, window.innerHeight)
   // Execute the function to generate a new network
   ForceGraph(
@@ -60,7 +40,7 @@ export const renderGraph = (initial) => {
     }
   );
 }
-export const getColorScale = () => d3.scaleOrdinal(config.subModules, COLOR_SCALE_RANGE);
+export const getColorScale = () => d3.scaleOrdinal(config.hierarchyData.subModuleNames, COLOR_SCALE_RANGE);
 
 // constants for drawTree function
 // From https://fontawesome.com/

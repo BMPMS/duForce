@@ -137,6 +137,9 @@ export default async function ForceGraph(
   }
     // add additional node variables
   showEle.nodes = showEle.nodes.reduce((acc, node) => {
+    if(!node.id){
+      node.id = node.data.id;
+    }
     const subModule = node.subModule ? node.subModule : node.data.subModule;
     const matchingSubmodule = subModulePositions.find((f) => f.name === subModule);
     if(!matchingSubmodule){
@@ -145,9 +148,8 @@ export default async function ForceGraph(
     node.color = matchingSubmodule.fill;
    // node.radiusVar = config.graphDataType === "parameter" ? node.linkCount : node.data.parameterCount;
     node.radiusVar = config.graphDataType === "parameter" ? node.linkCount : node.data.linkCount;
-    node.startPosition = [matchingSubmodule.x, matchingSubmodule.y];
     node.radius = nodeRadiusScale(node.radiusVar);
-    node.group = node.subModule;
+    node.group = node.subModule || node.data.subModule;
     acc.push(node);
     return acc;
   }, [])
@@ -825,6 +827,7 @@ export default async function ForceGraph(
     return selectedLinks;
   }
 
+
   // Update coordinates of all nodes + links based on current config settings
   function updatePositions(zoomToBounds, fromNearestNeighbourDefaultNodeClick, afterDrag) {
 
@@ -961,7 +964,7 @@ export default async function ForceGraph(
       // for each submodule
       expandedSubmodules.forEach((submodule) => {
         // fetch node from data
-        const submoduleNode = subModuleNodes.find((f) => f.id === submodule);
+        const submoduleNode = subModuleNodes.find((f) => f.data.id === submodule);
         if(submoduleNode){
           // simulate a click and re-run simulation
           clickMacroMeso(submoduleNode);
@@ -972,7 +975,7 @@ export default async function ForceGraph(
       expandedSegments.forEach((segment) => {
         // for each segment
         // fetch submodule from current simulation (for position)
-        const segmentNode = showEle.nodes.find((f) => f.id === segment);
+        const segmentNode = showEle.nodes.find((f) => f.data.id === segment);
         if(segmentNode){
           // simulate a click and re-run simulation
           clickMacroMeso(segmentNode);
@@ -1022,18 +1025,32 @@ export default async function ForceGraph(
         }
       }
     chartNodes = showEle.nodes;
-    // find links for all visible nodes
-    chartLinks = config.hierarchyData.allLinks.reduce((acc, link, index) => {
-      if(showEle.nodes.some((s) => s.id === link.source) && showEle.nodes.some((s) => s.id === link.target)){
-        if(!acc.some((s) => (s.source === link.source && s.target === link.target) || (s.source === link.target && s.target === link.source)))
+
+    const visibleNodeIds = showEle.nodes.map((m) => m.id);
+    const linkDirectionValue = (array) => array.length > 1 ? "both" : array[0];
+    chartLinks = chartNodes.reduce((acc,entry) => {
+      const currentLinks = entry.data.links.filter((f) => visibleNodeIds.includes(f.id));
+      currentLinks.forEach((link) => {
+        const matching = acc.find((f) => f.source === entry.id && f.target === link.id || f.source === link.id && f.target === entry.id);
+        if(matching){
+          if(matching.direction !== "both"){
+            if(link.type === "both" ){
+              matching.direction = "both";
+            } else {
+              if(matching[link.type] !== link.id){
+                matching.direction = "both";
+              }
+            }
+          }
+        } else {
           acc.push({
-            source: link.source,
-            target: link.target,
-            direction: link.direction,
-            index
+            source: entry.id,
+            target: link.id,
+            direction: link.type
           })
-      }
-      return acc;
+        }
+      })
+      return acc
     },[])
       console.log('macro meso simulation')
     // re-run simulation
@@ -1220,20 +1237,24 @@ export default async function ForceGraph(
         if(!matchingSubModule){
           console.error(`no matching submodule for ${descendant.data.subModule} - shouldn't happen!`)
         }
+        let filteredChildren = descendant.children
+        if(type === "tier2" && !config.showParameters){
+          filteredChildren = descendant.children.filter((f) => !f.isParameter)
+        }
         return {
           id: descendant.data.id,
           name: descendant.data.NAME,
           radius: nodeRadiusScale(descendant.data.linkCount),
           color: matchingSubModule.fill,
-          startPosition: matchingSubModule ? [matchingSubModule.x,matchingSubModule.y] : undefined,
-          children: descendant.children
-            ? descendant.children.map((m) => m.data.id)
+          children: filteredChildren
+            ? filteredChildren.map((m) => m.data.id)
             : [],
-          parameterCount: descendant.children ? descendant.leaves().length : 0,
-          radiusVar: descendant.children ? descendant.leaves().length : 0,
+          parameterCount: filteredChildren ? descendant.leaves().length : 0,
+          radiusVar: filteredChildren ? descendant.leaves().length : 0,
           group: descendant.data.type === "tier3" ? descendant.data.parent : descendant.data.subModule,
           parent: descendant.parent.data.id,
           subModule: descendant.data.subModule,
+          data: {links: descendant.data.links},
           type,
           x,
           y
@@ -1243,7 +1264,8 @@ export default async function ForceGraph(
       if((d.children) && d.type !== "tier3"){
         const childIds = d.children.length === 0 ? [] : typeof d.children[0] !== "object" ? d.children : d.children.map((m) => m.data.id);
         childIds.forEach((child) => {
-          const newType = d.type === "tier1" ? "tier2" : "tier3";
+          const currentType = d.type || d.data.type
+          const newType = currentType === "tier1" ? "tier2" : "tier3";
           showEle.nodes.push(getNewMacroMesoNode(child, d.x, d.y, newType));
         })
         config.setExpandedMacroMesoNodes(config.expandedMacroMesoNodes.concat(d.id));

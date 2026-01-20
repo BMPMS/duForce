@@ -22,8 +22,7 @@ export const config = {
   // graph data set on initial load
   allNodeNames: [],
   expandedMacroMesoNodes: [],
-  hierarchyData: {},
-  subModules: [],
+  hierarchyData: {subModuleNames: [], subModuleNodes: [], segmentNames: [],segmentNodes:[], allLinks: []},
   parameterData: {},
   // tree data set on initial load
   expandedTreeData: {}, // stored for expandAll button
@@ -239,13 +238,6 @@ export const config = {
       this.currentTreeData = newObject;
     } else {
       console.error("Expected an array for currentTreeData.");
-    }
-  },
-  setSubModules(newArray) {
-    if (Array.isArray(newArray)) {
-      this.subModules = newArray;
-    } else {
-      console.error("Expected an array for setSelectedNodeName.");
     }
   },
   setSelectedNodeNames(newArray) {
