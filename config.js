@@ -1,11 +1,10 @@
 // config.js
 
-import {
-  COLOR_SCALE_RANGE, LABEL_FONT_BASE_REM,
+import {  LABEL_FONT_BASE_REM,
   LINK_FORCE_STRENGTH,
   NODE_RADIUS_RANGE,
   PARAMETER_CLUSTER_STRENGTH,
-  RADIUS_COLLIDE_MULTIPLIER, SHOW_SETTINGS, SIMULATION_TICK_TIME,
+  RADIUS_COLLIDE_MULTIPLIER, SIMULATION_TICK_TIME,
 } from "./constants";
 
 export const config = {
@@ -22,8 +21,7 @@ export const config = {
   // graph data set on initial load
   allNodeNames: [],
   expandedMacroMesoNodes: [],
-  hierarchyData: {},
-  subModules: [],
+  hierarchyData: {subModuleNames: [], subModuleNodes: [], segmentNames: [],segmentNodes:[], mmLinks: [], segmentSubmoduleMapper:{}},
   parameterData: {},
   // tree data set on initial load
   expandedTreeData: {}, // stored for expandAll button
@@ -239,13 +237,6 @@ export const config = {
       this.currentTreeData = newObject;
     } else {
       console.error("Expected an array for currentTreeData.");
-    }
-  },
-  setSubModules(newArray) {
-    if (Array.isArray(newArray)) {
-      this.subModules = newArray;
-    } else {
-      console.error("Expected an array for setSelectedNodeName.");
     }
   },
   setSelectedNodeNames(newArray) {

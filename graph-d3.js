@@ -2,7 +2,7 @@ import * as d3 from "d3";
 import Graph from "graphology";
 import Fuse from 'fuse.js'
 import { config } from "./config";
-import { drawTree, remToPx } from "./tree";
+import { drawTree, getUrlId, remToPx, resetNodeHighlight } from "./tree";
 import {
   LINK_ARROW_COLOR,
   LINK_COLOR,
@@ -10,10 +10,120 @@ import {
   RADIUS_COLLIDE_MAX,
   TOOLTIP_KEYS,
   NODE_RADIUS_RANGE_MACRO_MESO,
-  SHOW_SETTINGS, COLOR_SCALE_RANGE, LABEL_FONT_BASE_REM,
+  SHOW_SETTINGS,
 } from "./constants";
 import { dijkstra } from "graphology-shortest-path";
 
+let zoom = d3.zoom();
+let showEle;
+
+const getLinkPath = (d) => {
+  // custom path to account for source + target radii so arrows will be visible
+  const path = d3.select(`#arrowLinkPath${d.index}`).node();
+  if(path){
+    const totalLength = path.getTotalLength();
+    const start = path.getPointAtLength(d.source.radius + 2);
+    const end = path.getPointAtLength(totalLength - (d.target.radius + 2));
+    return `M${start.x},${start.y},L${end.x},${end.y}`
+  }
+  return "";
+}
+
+const drawChartLinks = (svg, chartLinks) => {
+  // functions for defining link attributes
+  const checkLinkSelected = (link) => {
+    if(config.currentLayout === "default" && config.graphDataType === "parameter"){
+      return config.selectedNodeNames.includes(getSourceId(link)) &&
+        config.selectedNodeNames.includes(getTargetId(link))
+    }
+    return true;
+  }
+
+  const getLinkAlpha = (link, linkLength) => {
+    const expandedAll = config.selectedNodeNames.length === config.allNodeNames.length;
+    if(linkLength < 100) return 0.9;
+    if(linkLength <= 2000 ) return 0.75;
+    const linkOpacity =  0.5;
+    if(expandedAll || config.currentLayout !== "default" || config.graphDataType !== "parameter") return linkOpacity;
+    if(checkLinkSelected(link)) return linkOpacity;
+    return 0.1;
+  }
+
+  // append chartLinks to linksGroup and define attributes
+  const linksGroup = svg.select(".linkGroup")
+    .selectAll(".linksGroup")
+    .data(chartLinks)
+    .join((group) => {
+      const enter = group.append("g").attr("class", "linksGroup");
+      enter.append("path").attr("class", "allLinkPaths linkPathForArrows");
+      enter.append("path").attr("class", "allLinkPaths linkPath");
+      return enter;
+    });
+
+  // standard link which to create custom path in getLinkPath
+  linksGroup
+    .select(".linkPathForArrows")
+    .attr("id", (d) => `arrowLinkPath${d.index}`)
+    .attr("pointer-events", "none")
+    .attr("stroke", "transparent")
+    .attr("fill","none")
+    .attr("d", (d) => `M${d.source.x},${d.source.y},L${d.target.x},${d.target.y}`)
+
+  // visible link
+  linksGroup
+    .select(".linkPath")
+    .attr("pointer-events", "none")
+    .attr("stroke-opacity", (d) => getLinkAlpha(d,chartLinks.length))
+    .attr("stroke-width", config.graphDataType === "parameter" ? 0.75 : 1.25)
+    .attr("stroke", LINK_COLOR)
+    .attr("fill","none");
+
+  const highlightPath = config.graphDataType === "parameter" && config.nearestNeighbourOrigin !== ""
+  && config.currentLayout === "default" ? "Highlight" : "";
+
+  // adding arrows after link and standard link are rendered
+  svg.selectAll(".linkPath")
+    .attr("d", getLinkPath)
+    .attr("marker-start",(d) => checkLinkSelected(d) &&  d.direction === "both"  ? `url(#arrowPathStart${highlightPath})` : "")
+    .attr("marker-end",(d) => checkLinkSelected(d)  ? `url(#arrowPathEnd${highlightPath})` : "")
+
+}
+const getZoomCalculations = (currentNodes) => {
+
+  const [xExtent0, xExtent1] = d3.extent(currentNodes, (d) => d.fx || d.x);
+  // using === undefined here as it's valid when the extent = 0;
+  if(xExtent0 === undefined || xExtent1 === undefined) return {translateX: 0, translateY: 0, fitToScale: 1};
+  const [yExtent0, yExtent1] = d3.extent(currentNodes, (d) => d.fy || d.y);
+  if(yExtent0 === undefined || yExtent1 === undefined) return {translateX: 0, translateY: 0, fitToScale: 1};
+  let xWidth = xExtent1 - xExtent0 + (currentNodes.length === 1 ? 250 : 100);
+  let yWidth = yExtent1 - yExtent0 + (currentNodes.length === 1 ? 250 : 100);
+  const screenWidth = window.innerWidth;
+  const screenHeight = window.innerHeight;
+
+  const translateX = -(xExtent0 + xExtent1) / 2;
+  const translateY = -(yExtent0 + yExtent1) / 2 + (config.currentLayout === "nearestNeighbour" ? 30 : 0);
+  const fitToScale = 0.95 / Math.max(xWidth / screenWidth, yWidth / screenHeight);
+  return {translateX, translateY, fitToScale};
+};
+
+export const zoomToFit = (baseSvg,currentNodes, transitionTime) => {
+
+  const screenWidth = window.innerWidth;
+  const screenHeight = window.innerHeight;
+  const {translateX, translateY, fitToScale} = getZoomCalculations(currentNodes === "all" ? showEle.nodes : currentNodes);
+  baseSvg
+    .interrupt()
+    .transition()
+    .duration(transitionTime)
+    .call(
+      zoom.transform,
+      d3.zoomIdentity
+        .scale(1)
+        .translate(screenWidth / 2, screenHeight / 2)
+        .scale(fitToScale)
+        .translate(translateX,  translateY)
+    );
+}
 
 const resetMenuVisibility = () => {
   let buttonPosition = 2.9;
@@ -74,8 +184,9 @@ const resetMenuVisibility = () => {
   d3.selectAll(".viewButton").style("top",`${buttonPosition + 0.2}rem`);
   d3.select("#resetButton").style("top",`${buttonPosition + 0.8}rem`);
   d3.select("#search-tab-container").style("height", searchTabContainerHeight);
-
+  d3.selectAll(".nnLabelGroup").attr("display",config.currentLayout === "nearestNeighbour" ? "block" : "none")
 }
+
 export default async function ForceGraph(
   {
     nodes, // an iterable of node objects (typically [{id}, …])
@@ -86,10 +197,14 @@ export default async function ForceGraph(
     initial = true,
     width = 640, // outer width, in pixels
     height = 400, // outer height, in pixels
-    subModulePositions // name, x,y, fill
+    subModuleColors, // name, fill,
+    nearestNeighbour
 
   } = {}
 ) {
+  if(nearestNeighbour){
+    positionNearestNeighbours(true);
+  }
 
   // temporarily putting constants here.
   const NODE_RADIUS_RANGE = [config.radiusMin,config.radiusMax];
@@ -104,7 +219,7 @@ export default async function ForceGraph(
   resetMenuVisibility(width);
   let expandedAll = config.graphDataType !== "parameter" || nodes.length === config.selectedNodeNames.length;
   // data for charts
-  const showEle = { nodes, links};
+  showEle = { nodes, links};
 
   // set scales
   let radiusMax = config.graphDataType === "parameter" ?
@@ -137,17 +252,19 @@ export default async function ForceGraph(
   }
     // add additional node variables
   showEle.nodes = showEle.nodes.reduce((acc, node) => {
+    if(!node.id){
+      node.id = node.data.id;
+    }
     const subModule = node.subModule ? node.subModule : node.data.subModule;
-    const matchingSubmodule = subModulePositions.find((f) => f.name === subModule);
+    const matchingSubmodule = subModuleColors.find((f) => f.name === subModule);
     if(!matchingSubmodule){
       console.error('PROBLEM WITH MATCHING SUBMODULE - should not happen!!!!')
     }
     node.color = matchingSubmodule.fill;
    // node.radiusVar = config.graphDataType === "parameter" ? node.linkCount : node.data.parameterCount;
     node.radiusVar = config.graphDataType === "parameter" ? node.linkCount : node.data.linkCount;
-    node.startPosition = [matchingSubmodule.x, matchingSubmodule.y];
-    node.radius = nodeRadiusScale(node.radiusVar);
-    node.group = node.subModule;
+    node.radius = (node.isParameter || node.data?.isParameter) ? (config.graphDataType === "parameter" ?  1 : 3) :  nodeRadiusScale(node.radiusVar);
+    node.group = node.subModule || node.data.subModule;
     acc.push(node);
     return acc;
   }, [])
@@ -184,7 +301,7 @@ export default async function ForceGraph(
 
   const parameterStrengthScale = d3.scaleLinear()
     .domain([0,radiusMax])
-    .range([0.05,1])
+    .range([0.01,0.4])
   const getXYStrength = (d) => {
     if(config.graphDataType === "parameter") return parameterStrengthScale(d.linkCount);
     if(d.type === "tier1") return 0.3;
@@ -194,7 +311,8 @@ export default async function ForceGraph(
   // Initialize simulation
   const simulation = d3
     .forceSimulation()
-    .force("link", d3.forceLink().id((d) => d.id).strength((link) => {
+    .force("charge", d3.forceManyBody().strength((d) => config.graphDataType !== "parameter"  ? 0 : -300))
+.force("link", d3.forceLink().id((d) => d.id).strength((link) => {
       if(config.graphDataType !== "parameter"){
         return 0
       } // default from https://d3js.org/d3-force/link as distance doesn't matter here
@@ -206,11 +324,10 @@ export default async function ForceGraph(
     .force("collide", d3.forceCollide() // change segment when ready
       .radius((d) => config.graphDataType !== "parameter" ? d.radius * 4 : Math.min(d.radius * RADIUS_COLLIDE_MULTIPLIER, RADIUS_COLLIDE_MAX))
       .strength(0.8)
-      .iterations(config.graphDataType === "parameter" ? 1 : 3)
+      .iterations(config.graphDataType === "parameter" ? 5 : 3)
     ) // change segment when ready
     .force("cluster", forceCluster()) // cluster all nodes belonging to the same submodule.
     // change segment when ready
-    .force("charge", d3.forceManyBody().strength((d) => config.graphDataType !== "parameter"  ? 0 : -250));
 
   simulation.stop();
 
@@ -273,9 +390,7 @@ export default async function ForceGraph(
     .attr("stroke-linejoin", "round")
     .attr("d", "M1, -4L9,0L1,4") // M9,-4L1,0L9,4 (start)
 
-  if(!(config.graphDataType === "parameter" && config.currentLayout === "nearestNeighbour" && config.nearestNeighbourOrigin !== "")){
-    renderNNLevelLabels([]);
-  }
+
 
   // zoom and zoom functions
   let currentZoomLevel = 1;
@@ -284,10 +399,11 @@ export default async function ForceGraph(
   const getNodeLabelDisplay = (d) => {
     if(config.graphDataType !== "parameter") return "block";
    // if((config.graphDataType !== "parameter" && d.type !== "tier3") || config.currentLayout === "shortestPath") return "block";
-    if(config.currentLayout === "nearestNeighbour") return "block";
-    if(config.currentLayout === "default" && !expandedAll) {
-      return config.selectedNodeNames.includes(d.id) ? "block" : "none";
-    }
+   // if(config.currentLayout === "nearestNeighbour") return "block";
+   // if(config.currentLayout === "default" && !expandedAll) {
+   //   return config.selectedNodeNames.includes(d.id) ? "block" : "none";
+   // }
+    if(d.NAME === config.nearestNeighbourOrigin || config.currentLayout === "shortestPath") return "block";
     return currentZoomLevel > 2 ? "block":"none";
   }
 
@@ -309,9 +425,7 @@ export default async function ForceGraph(
     return `${LABEL_FONT_BASE_REM}rem`
   }
 
-  const zoom = d3
-    .zoom()
-    .on("zoom", (event) => {
+   zoom.on("zoom", (event) => {
       const { x, y, k } = event.transform;
       currentZoomLevel = k;
       svg.attr("transform", `translate(${x},${y}) scale(${k})`);
@@ -323,23 +437,6 @@ export default async function ForceGraph(
 
   baseSvg.call(zoom).on("dblclick.zoom", null);
 
-  const getZoomCalculations = (currentNodes) => {
-
-    const [xExtent0, xExtent1] = d3.extent(currentNodes, (d) => d.fx || d.x);
-    // using === undefined here as it's valid when the extent = 0;
-    if(xExtent0 === undefined || xExtent1 === undefined) return {translateX: 0, translateY: 0, fitToScale: 1};
-    const [yExtent0, yExtent1] = d3.extent(currentNodes, (d) => d.fy || d.y);
-    if(yExtent0 === undefined || yExtent1 === undefined) return {translateX: 0, translateY: 0, fitToScale: 1};
-    let xWidth = xExtent1 - xExtent0 + (currentNodes.length === 1 ? 250 : 100);
-    let yWidth = yExtent1 - yExtent0 + (currentNodes.length === 1 ? 250 : 100);
-    const screenWidth = window.innerWidth;
-    const screenHeight = window.innerHeight;
-
-    const translateX = -(xExtent0 + xExtent1) / 2;
-    const translateY = -(yExtent0 + yExtent1) / 2 + (config.currentLayout === "nearestNeighbour" ? 30 : 0);
-    const fitToScale = 0.95 / Math.max(xWidth / screenWidth, yWidth / screenHeight);
-    return {translateX, translateY, fitToScale};
-  };
   const performZoomAction  =  (
     currentNodes,
     transitionTime,
@@ -351,21 +448,7 @@ export default async function ForceGraph(
       baseSvg.interrupt().transition().duration(transitionTime).call(zoom.scaleBy, 0.5);
     }
     if (zoomAction === 'zoomFit') {
-      const screenWidth = window.innerWidth;
-      const screenHeight = window.innerHeight;
-      const {translateX, translateY, fitToScale} = getZoomCalculations(currentNodes);
-      baseSvg
-        .interrupt()
-        .transition()
-        .duration(transitionTime)
-        .call(
-          zoom.transform,
-          d3.zoomIdentity
-            .scale(1)
-            .translate(screenWidth / 2, screenHeight / 2)
-            .scale(fitToScale)
-            .translate(translateX,  translateY)
-        );
+      zoomToFit(baseSvg, currentNodes, transitionTime);
     }
   };
   const resetDefaultNodes = () => {
@@ -389,12 +472,19 @@ export default async function ForceGraph(
     d3.selectAll(".directionToggle")
       .on("change", (event) => {
         config.setTooltipRadio(event.currentTarget.value);
-        updatePositions(true);
         if(event.currentTarget.value !== "both"){
           const filteredListToShow = config.notDefaultSelectedNodeNames.filter((f) => f.direction === event.currentTarget.value);
           const tooltipContent = getTooltipTable(filteredListToShow,{});
           tooltip.html(`${tooltipContent.join("")}`)
+          const nodeNames = filteredListToShow.map((m) => m.name).concat(config.nearestNeighbourOrigin);
+          svg.selectAll(".nodeOpacityCircle")
+            .attr("opacity", (d) =>  nodeNames.includes(d.NAME) ? 1 : 0.2);
+          svg.selectAll(".allLinkPaths")
+          .attr("opacity",(f) => nodeNames.includes(f.source.NAME)  && nodeNames.includes(f.target.NAME) ? 1 : 0)
         } else {
+          svg.selectAll(".allLinkPaths")
+            .attr("opacity",1);
+          resetNodeHighlight();
           const tooltipContent = getTooltipTable(config.notDefaultSelectedNodeNames,{});
           tooltip.html(`${tooltipContent.join("")}`)
         }
@@ -403,7 +493,9 @@ export default async function ForceGraph(
   }
 
   if (!initial && !(config.currentLayout === "default" && config.defaultNodePositions.length === 0)) {
+    // not initial load OR positioning currently saved
     if (config.currentLayout === "default") {
+      // for default, reset positions and re-run the simulation
       resetDefaultNodes();
       simulation.nodes([]).force("link").links([]);
       simulation.nodes(showEle.nodes).force("link").links(showEle.links);
@@ -441,21 +533,16 @@ export default async function ForceGraph(
   // updateButtons
   updateButtons(graph);
 
-  // used to generate URL string - NN, SP, Macro
-  function getUrlId (str)  {
-    const hasCapital  = /[A-Z]/.test(str);
-    return hasCapital ? `~${str}` : str;
-  }
-
   // nearest neighbour functions
-  function getNeighbours (nameArray, direction, nnDepth, previousNNNodes) {
+  function getNeighbours (nameArray, direction, nnDepth, previousNNNodes,allNodes) {
     return  nameArray.reduce((acc, origin) => {
-    const neighbourLinks = showEle.links.filter((f) => (direction === "outbound" ? getSourceId(f) : getTargetId(f)) === origin)
-    neighbourLinks.forEach((d) => {
+    const neighbourLinks = showEle.links
+      .filter((f) => (direction === "outbound" ? getSourceId(f) : getTargetId(f)) === origin);
+      neighbourLinks.forEach((d) => {
       const source = getSourceId(d);
       const target = getTargetId(d);
       const oppositeNode = source === origin ? target : source;
-      if(!previousNNNodes.includes(oppositeNode) && !acc.some((s) => s.node === oppositeNode)){
+      if(!allNodes.includes(oppositeNode) && !acc.some((s) => s.node === oppositeNode)){
         acc.push({
           source, target, direction,depth: nnDepth, node: oppositeNode
         })
@@ -465,18 +552,21 @@ export default async function ForceGraph(
     }, [])}
 
   function getNearestNeighbourLinks  ()  {
-    const depth1OutboundLinks = getNeighbours([config.nearestNeighbourOrigin], "outbound",1,[]);
-    const depth1InboundLinks = getNeighbours([config.nearestNeighbourOrigin],"inbound",1,[]);
+    const depth1OutboundLinks = getNeighbours([config.nearestNeighbourOrigin], "outbound",1,[],[]);
+    const depth1InboundLinks = getNeighbours([config.nearestNeighbourOrigin],"inbound",1,[],[]);
     const depth1Links = depth1OutboundLinks.concat(depth1InboundLinks);
     if(config.nearestNeighbourDegree > 1 && depth1Links.length > 0){
-      const depth1NodeNames = [config.nearestNeighbourOrigin].concat(depth1Links.map((m) => m.node));
-      const depth2OutboundLinks = getNeighbours(depth1OutboundLinks.map((m) => m.node),"outbound",2,depth1NodeNames);
-      const depth2InboundLinks = getNeighbours( depth1InboundLinks.map((m) => m.node),"inbound",2,depth1NodeNames);
+      const allNodes = [config.nearestNeighbourOrigin].concat(depth1Links.map((m) => m.node));
+      const depth1NodeNames = depth1Links.map((m) => m.node)
+
+      const depth2OutboundLinks = getNeighbours(depth1OutboundLinks.map((m) => m.node),"outbound",2,depth1NodeNames,allNodes);
+      const depth2InboundLinks = getNeighbours( depth1InboundLinks.map((m) => m.node),"inbound",2,depth1NodeNames,allNodes);
       const depth2Links = depth2OutboundLinks.concat(depth2InboundLinks);
       if(config.nearestNeighbourDegree > 2 && depth2Links.length > 0){
-        const depth2NodeNames = depth1NodeNames.concat(depth2Links.map((m) => m.node));
-        const depth3OutboundLinks = getNeighbours(depth2OutboundLinks.map((m) => m.node),"outbound",3,depth2NodeNames);
-        const depth3InboundLinks = getNeighbours( depth2InboundLinks.map((m) => m.node),"inbound",3,depth2NodeNames);
+        const allNodes = depth1NodeNames.concat(depth2Links.map((m) => m.node));
+        const depth2NodeNames = depth2Links.map((m) => m.node);
+        const depth3OutboundLinks = getNeighbours(depth2OutboundLinks.map((m) => m.node),"outbound",3,depth2NodeNames,allNodes);
+        const depth3InboundLinks = getNeighbours( depth2InboundLinks.map((m) => m.node),"inbound",3,depth2NodeNames,allNodes);
         const depth3Links = depth3OutboundLinks.concat(depth3InboundLinks);
         return depth1Links.concat(depth2Links).concat(depth3Links);
       }
@@ -502,11 +592,14 @@ export default async function ForceGraph(
     return arr;
   }
 
-  function renderNNLevelLabels (nnData) {
+  function renderNNLevelLabels (svg,nnData) {
+
     // render (or unrenders) the level titles
     const nnWidth = 200;
     const nnHeight = 1000;
 
+    svg.selectAll(".nnLabelGroup")
+      .attr("display","block");
     // need to add arrows
     const nnLabelGroup = svg.select(".nnGroup")
       .selectAll(".nnLabelGroup")
@@ -539,6 +632,10 @@ export default async function ForceGraph(
     return {nnWidth, nnHeight};
   }
   function positionNearestNeighbours(nodeClick) {
+    // duplicating here for call from tree.
+    const svg = d3.select(".chartGroup");
+    const baseSvg = d3.select(".baseSvg");
+
     // reset links and nodes
     config.setNotDefaultSelectedLinks([]);
     config.setNotDefaultSelectedNodeNames([]);
@@ -546,7 +643,7 @@ export default async function ForceGraph(
      // get the links
     const nnLinks = getNearestNeighbourLinks();
 
-    const {nnWidth, nnHeight} = renderNNLevelLabels(nodeClick ? [] : generateSymmetricNNArray(nnLinks));
+    const {nnWidth, nnHeight} = renderNNLevelLabels(svg,nodeClick ? [] : generateSymmetricNNArray(nnLinks));
 
     const getNNHierarchy = (parentId, id, direction, rootLink) =>  d3
       .stratify()
@@ -565,7 +662,6 @@ export default async function ForceGraph(
 
     const outboundRootLink = [{ source: "", target: config.nearestNeighbourOrigin }];
     const outboundHierarchy = getNNHierarchy("source","target","outbound",outboundRootLink);
-
     // calculate the maximum column radius for each depth direction
     const radiusByDepthDirection = nnLinks.reduce((acc, link) => {
       const depthDirection = `${link.depth}-${link.direction}`;
@@ -667,14 +763,33 @@ export default async function ForceGraph(
     config.setNotDefaultSelectedLinks(nnLinks);
     config.setNotDefaultSelectedNodeNames(allNNNodes);
 
-    if(nodeClick){
+    if(config.currentLayout === "default"){
       // if from default view, set's selectedNodeNames
       config.setSelectedNodeNames(allNNNodes.map((m) => m.name));
     }
+    // duplicating here for from tree call
+    const windowBaseUrl = window.location.href.split("?")[0];
     const nnUrl = `${windowBaseUrl}?${config.currentLayout === "default" ? "NND" :"NNV"}=${getUrlId(config.nearestNeighbourOrigin)}:${config.nearestNeighbourDegree}`;
     history.replaceState(null, '', nnUrl);
     resetMenuVisibility();
-    updatePositions(true,nodeClick);
+    if(config.currentLayout === "default"){
+      resetNodeHighlight()
+      svg.selectAll(".nodeBackgroundCircle")
+        .classed("pulseNN", (d) =>  config.nearestNeighbourOrigin === d.id)
+
+      const nnChartLinks = showEle.links.filter((f) => config.notDefaultSelectedLinks
+        .some((s) => s.source === getSourceId(f) && s.target === getTargetId(f)))
+
+
+      drawChartLinks(svg, nnChartLinks);
+      zoomToFit(baseSvg,showEle.nodes.filter((f) => config.selectedNodeNames.includes(f.NAME)),300)
+      const currentNode = showEle.nodes.find((f) => f.id === config.nearestNeighbourOrigin)
+      updateTooltip(currentNode,false);
+      d3.select(".animation-container").style("display", "none");
+
+    } else {
+      updatePositions(true,nodeClick);
+    }
   }
 
   // shortest path functions
@@ -740,7 +855,6 @@ export default async function ForceGraph(
   // node click
   function clickNode (nodeName,origin, graph){
     // reset background circle and infoMessage
-    d3.selectAll(".nodeBackgroundCircle").attr("stroke-width",0);
     d3.select("#infoMessage").style("visibility","hidden");
     if(origin === "search" && config.graphDataType !== "parameter"){
       showEle.nodes.map((m) => m.clicked = false);
@@ -824,6 +938,7 @@ export default async function ForceGraph(
 
     return selectedLinks;
   }
+
 
   // Update coordinates of all nodes + links based on current config settings
   function updatePositions(zoomToBounds, fromNearestNeighbourDefaultNodeClick, afterDrag) {
@@ -910,14 +1025,15 @@ export default async function ForceGraph(
     // now get the links
     let chartLinks = showEle.links;
     // filter if NN or not expandedAll
-    if(fromNearestNeighbourDefaultNodeClick || config.tooltipRadio !== "none"){
+    if(fromNearestNeighbourDefaultNodeClick ||  config.tooltipRadio !== "none"
+    || (config.graphDataType === "parameter" && config.nearestNeighbourOrigin !== "")){
       chartLinks = showEle.links.filter((f) => config.notDefaultSelectedLinks
         .some((s) => s.source === getSourceId(f) && s.target === getTargetId(f)));
     } else if (chartNodes.length !== showEle.nodes.length){
        chartLinks = showEle.links.filter((f) =>
          chartNodes.some((s) => s.NAME === getSourceId(f)) &&
          chartNodes.some((s) => s.NAME === getTargetId(f)));
-    } else if (config.graphDataType === "parameter" && chartLinks.length > 4000){
+    } else if (chartLinks.length > 2500){
       chartLinks = selectSpatiallyEvenLinks(showEle.links,chartNodes,2000);
     }
 
@@ -950,7 +1066,7 @@ export default async function ForceGraph(
       // stop simulation
       simulation.stop();
 
-      const {segmentNames, subModuleNames, subModuleNodes} = config.hierarchyData;
+      const {segmentNames, subModuleNames, subModuleNodes, mmLinks} = config.hierarchyData;
       // next section will only apply if macroMesoUrlExtras (populated on load in main.js) has entries
       // for each entry a simulation re-run is performed - seems illogical but this feature was
       // added at the end of dev and the key thing here is to make sure node positions are maintained
@@ -961,7 +1077,7 @@ export default async function ForceGraph(
       // for each submodule
       expandedSubmodules.forEach((submodule) => {
         // fetch node from data
-        const submoduleNode = subModuleNodes.find((f) => f.id === submodule);
+        const submoduleNode = subModuleNodes.find((f) => f.data.id === submodule);
         if(submoduleNode){
           // simulate a click and re-run simulation
           clickMacroMeso(submoduleNode);
@@ -972,7 +1088,7 @@ export default async function ForceGraph(
       expandedSegments.forEach((segment) => {
         // for each segment
         // fetch submodule from current simulation (for position)
-        const segmentNode = showEle.nodes.find((f) => f.id === segment);
+        const segmentNode = showEle.nodes.find((f) => f.data.id === segment);
         if(segmentNode){
           // simulate a click and re-run simulation
           clickMacroMeso(segmentNode);
@@ -1022,20 +1138,19 @@ export default async function ForceGraph(
         }
       }
     chartNodes = showEle.nodes;
-    // find links for all visible nodes
-    chartLinks = config.hierarchyData.allLinks.reduce((acc, link, index) => {
-      if(showEle.nodes.some((s) => s.id === link.source) && showEle.nodes.some((s) => s.id === link.target)){
-        if(!acc.some((s) => (s.source === link.source && s.target === link.target) || (s.source === link.target && s.target === link.source)))
-          acc.push({
-            source: link.source,
-            target: link.target,
-            direction: link.direction,
-            index
-          })
-      }
-      return acc;
-    },[])
-      console.log('macro meso simulation')
+
+    const visibleNodeIds = showEle.nodes.map((m) => m.id);
+
+    chartLinks =  mmLinks
+      .filter((f) => visibleNodeIds.includes(f.source) && visibleNodeIds.includes(f.target))
+      .map(f => ({ ...f }));
+
+    if(visibleNodeIds.some((s) => !(s.includes('segment') || s.includes('submodule')))){
+      config.parameterData.links
+        .filter((f) => visibleNodeIds.includes(f.source) && visibleNodeIds.includes(f.target))
+        .forEach((link) => chartLinks.push(link));
+    }
+
     // re-run simulation
     simulation.nodes([]).force("link").links([])
     simulation.nodes(showEle.nodes).force("link").links(chartLinks);
@@ -1051,92 +1166,17 @@ export default async function ForceGraph(
     // filter out single if requested
     if(!config.showSingleNodes && config.currentLayout === "default"){
       if(config.graphDataType === "parameter"){
-        chartNodes = chartNodes.filter((f) => f.allLinksCount > 0);
+        chartNodes = chartNodes.filter((f) => f.linkCount > 0);
       } else {
         // macro or meso
         chartNodes = chartNodes.filter((f) => f.type !== "tier3" || (f.type === "tier3" && chartLinks.some((s) =>
         getSourceId(s) === f.id || getTargetId(s) === f.id)))
       }
-
     }
 
-    // functions for defining link attributes
-    const checkLinkSelected = (link) => {
-      if(config.currentLayout === "default" && config.graphDataType === "parameter"){
-        return config.selectedNodeNames.includes(getSourceId(link)) &&
-          config.selectedNodeNames.includes(getTargetId(link))
-      }
-      return true;
-    }
-
-
-    const getLinkAlpha = (link, linkLength) => {
-      if(linkLength < 100) return 0.9;
-      if(linkLength <= 2000 ) return 0.75;
-      const linkOpacity =  0.5;
-      if(expandedAll || config.currentLayout !== "default" || config.graphDataType !== "parameter") return linkOpacity;
-      if(checkLinkSelected(link)) return linkOpacity;
-      return 0.1;
-    }
-
-    const getLinkPath = (d) => {
-      // custom path to account for source + target radii so arrows will be visible
-      const path = d3.select(`#arrowLinkPath${d.index}`).node();
-      if(path){
-        const totalLength = path.getTotalLength();
-        const start = path.getPointAtLength(d.source.radius + 2);
-        const end = path.getPointAtLength(totalLength - (d.target.radius + 2));
-        return `M${start.x},${start.y},L${end.x},${end.y}`
-      }
-      return "";
-    }
-
-    // append chartLinks to linksGroup and define attributes
-    const linksGroup = svg.select(".linkGroup")
-      .selectAll(".linksGroup")
-      .data(chartLinks)
-      .join((group) => {
-        const enter = group.append("g").attr("class", "linksGroup");
-        enter.append("path").attr("class", "allLinkPaths linkPathForArrows");
-        enter.append("path").attr("class", "allLinkPaths linkPath");
-        return enter;
-      });
-
-    // standard link which to create custom path in getLinkPath
-    linksGroup
-      .select(".linkPathForArrows")
-      .attr("id", (d) => `arrowLinkPath${d.index}`)
-      .attr("pointer-events", "none")
-      .attr("stroke", "transparent")
-      .attr("fill","none")
-      .attr("d", (d) => `M${d.source.x},${d.source.y},L${d.target.x},${d.target.y}`)
-
-    // visible link
-    linksGroup
-      .select(".linkPath")
-      .attr("pointer-events", "none")
-      .attr("stroke-opacity", (d) => getLinkAlpha(d,chartLinks.length))
-      .attr("stroke-width", config.graphDataType === "parameter" ? 0.75 : 1.25)
-      .attr("stroke", LINK_COLOR)
-      .attr("fill","none");
-
-    const highlightPath = config.graphDataType === "parameter" && config.nearestNeighbourOrigin !== ""
-    && config.currentLayout === "default" ? "Highlight" : "";
-
-    // adding arrows after link and standard link are rendered
-    svg.selectAll(".linkPath")
-      .attr("d", getLinkPath)
-      .attr("marker-start",(d) => checkLinkSelected(d) &&  d.direction === "both"  ? `url(#arrowPathStart${highlightPath})` : "")
-      .attr("marker-end",(d) => checkLinkSelected(d)  ? `url(#arrowPathEnd${highlightPath})` : "")
-
-    // functions for defining node attributes + functionality
-    const getNodeAlpha = (nodeName, linkCount,label) => {
-      if(expandedAll || config.currentLayout !== "default" || config.selectedNodeNames.includes(nodeName)) return 1;
-      return label ? 0 : 0.2;
-    }
+    drawChartLinks(svg, chartLinks);
 
     const dragged = (event, node) => {
-      console.log('dragging',node.x, event.x)
       // resetting data for affected nodes only rather than running updatePositions again
       // because render time was so much faster
       // reset node data
@@ -1160,8 +1200,6 @@ export default async function ForceGraph(
     }
 
     const dragended = (event, node) => {
-      console.log('ending',node.x, event.x)
-
       node.x = event.x;
           node.y = event.y;
     }
@@ -1194,46 +1232,34 @@ export default async function ForceGraph(
       svg.selectAll(".nodesGroup").attr("opacity",1);
       svg.selectAll(".nodeLabel").style("display", getNodeLabelDisplay);
       svg.selectAll(".allLinkPaths").style("display","block");
-      // reset nodes and links after a mouseout
-      svg.selectAll(".nodeCircle")
-        .attr("stroke-width", (d) =>   getNodeStrokeElements("width",d))
-        .attr("opacity",(d) =>
-          config.graphDataType !== "parameter" || config.currentLayout !== "default" ? 1 :
-            config.selectedNodeNames.includes(d.id) ? 1 : 0.2);
-    }
-
-    const nodeHighlightStroke = 14;
-    const getNodeStrokeElements = (element, d) => {
-      const defaultValue = element === "width" ? 0 : 1;
-      const highlight = element === "width" ? 0.5 : 0.5;
-      if(config.graphDataType !== "parameter") return d.radius < 6 ? 0.4 : 1;
-      if(d.id === config.nearestNeighbourOrigin) return highlight;
-      if(config.shortestPathStart === d.id && config.shortestPathEnd !== "") return highlight;
-      if(config.shortestPathEnd === d.id && config.shortestPathStart !== "") return highlight;
-      return defaultValue;
     }
 
     function getNewMacroMesoNode (nodeId, x,y, type)  {
         // used when resetting from URL click and in clickMacroMeso
         const descendant = config.expandedTreeData.descendants().find((f) => f.data.id === nodeId);
-        const matchingSubModule = subModulePositions.find((f) => f.name === descendant.data.subModule);
+        const matchingSubModule = subModuleColors.find((f) => f.name === descendant.data.subModule);
         if(!matchingSubModule){
           console.error(`no matching submodule for ${descendant.data.subModule} - shouldn't happen!`)
+        }
+        let filteredChildren = descendant.children
+        if(type === "tier2" && !config.showParameters){
+          filteredChildren = descendant.children.filter((f) => !f.isParameter)
         }
         return {
           id: descendant.data.id,
           name: descendant.data.NAME,
-          radius: nodeRadiusScale(descendant.data.linkCount),
+          DISPLAY_NAME: descendant.data.DISPLAY_NAME,
+          radius: descendant.data.isParameter ? 3 : nodeRadiusScale(descendant.data.linkCount),
           color: matchingSubModule.fill,
-          startPosition: matchingSubModule ? [matchingSubModule.x,matchingSubModule.y] : undefined,
-          children: descendant.children
-            ? descendant.children.map((m) => m.data.id)
+          children: filteredChildren
+            ? filteredChildren.map((m) => m.data.id)
             : [],
-          parameterCount: descendant.children ? descendant.leaves().length : 0,
-          radiusVar: descendant.children ? descendant.leaves().length : 0,
+          parameterCount: descendant.data.parameterCount,
+          radiusVar: filteredChildren ? descendant.leaves().length : 0,
           group: descendant.data.type === "tier3" ? descendant.data.parent : descendant.data.subModule,
           parent: descendant.parent.data.id,
           subModule: descendant.data.subModule,
+          data: {links: descendant.data.links},
           type,
           x,
           y
@@ -1243,8 +1269,16 @@ export default async function ForceGraph(
       if((d.children) && d.type !== "tier3"){
         const childIds = d.children.length === 0 ? [] : typeof d.children[0] !== "object" ? d.children : d.children.map((m) => m.data.id);
         childIds.forEach((child) => {
-          const newType = d.type === "tier1" ? "tier2" : "tier3";
-          showEle.nodes.push(getNewMacroMesoNode(child, d.x, d.y, newType));
+          const currentType = d.type || d.data.type
+          const newType = currentType === "tier1" ? "tier2" : "tier3";
+          if(newType === "tier3" && !config.showParameters){
+            const childNode = config.parameterData.nodes.find((f) => f.id === child);
+            if(childNode && !childNode.isParameter){
+              showEle.nodes.push(getNewMacroMesoNode(child, d.x, d.y, newType));
+            }
+          } else {
+            showEle.nodes.push(getNewMacroMesoNode(child, d.x, d.y, newType));
+          }
         })
         config.setExpandedMacroMesoNodes(config.expandedMacroMesoNodes.concat(d.id));
         showEle.nodes = showEle.nodes.filter((f) => f.id !== d.id);
@@ -1260,8 +1294,8 @@ export default async function ForceGraph(
       .data(chartNodes, (d) => d.id)
       .join((group) => {
         const enter = group.append("g").attr("class", "nodesGroup");
-        enter.append("circle").attr("class", "nodeBackgroundCircle");
-        enter.append("circle").attr("class", "nodeCircle");
+        enter.append("circle").attr("class", "nodeOpacityCircle nodeBackgroundCircle");
+        enter.append("circle").attr("class", "nodeOpacityCircle nodeCircle");
         enter.append("text").attr("class", "nodeLabel");
         return enter;
       });
@@ -1271,39 +1305,38 @@ export default async function ForceGraph(
         tooltip.style("visibility", "hidden");
         if(config.graphDataType !== "parameter"){
           // for submodule + segment
-          d3.select(event.currentTarget).select(".nodeCircle").attr("stroke-width",  1);
           if(!showEle.nodes.find((f) => f.clicked)){
             // highlighted if nothing clicked
             macroOrMesoHighlight(d);
           }
-          // update tooltip
-          let tooltipNode = config.parameterData.nodes.find((f) => f.id === d.id);
-          if(!tooltipNode){
-            tooltipNode = {NAME: d.data?.NAME || d.name, COLOR: d.color};
-
-            if(d.leaves){
-              tooltipNode["parameterCount"] =  d.leaves().length;
-            }
-            if(d.type === "tier2"){
-              tooltipNode["SUBMODULE_NAME"] = d.subModule;
-            }
+          let tooltipNode = {
+            NAME: d.data.NAME || d.name,
+            DISPLAY_NAME: d.data.DISPLAY_NAME || d.DISPLAY_NAME,
+            COLOR: d.color,
+            parameterCount: d.data.parameterCount || d.parameterCount
           }
-
+          const hierarchyType = d.type || d.data.type;
+          if(hierarchyType === "tier2"){
+            tooltipNode["SUBMODULE_NAME"] = config.hierarchyData.segmentSubmoduleMapper[d.subModule || d.group];
+          }
+          if(hierarchyType === "tier3"){
+            tooltipNode["SUBMODULE_NAME"] = config.hierarchyData.segmentSubmoduleMapper[d.subModule];
+            tooltipNode["SEGMENT_NAME"] = config.hierarchyData.segmentSubmoduleMapper[d.group];
+          }
           updateTooltip(tooltipNode,true);
           const tooltipStart = d.type === "tier3" ? "highlight" : "expand";
           showTooltipExtra(event.x + 10, event.y,`CLICK to ${tooltipStart}<br>SHIFT + CLICK to collapse`,false)
         } else {
-          d3.select(event.currentTarget).select(".nodeCircle").attr("stroke-width",  1 );
           updateTooltip(d, true);
           if(config.currentLayout === "nearestNeighbour"){
             // slightly different behaviour for NN
             svg.selectAll(".allLinkPaths")
               .style("display","none");
-            svg.selectAll(".nodesGroup").attr("opacity",0.2);
             svg.selectAll(".allLinkPaths")
               .filter((f) => d.nnLinkIds.includes(f.source.id) && d.nnLinkIds.includes(f.target.id))
               .style("display","block");
             svg.selectAll(".nodesGroup")
+              .attr("opacity",0.2)
               .filter((f) =>  d.nnLinkIds.includes(f.id))
               .attr("opacity",1);
           }
@@ -1329,6 +1362,7 @@ export default async function ForceGraph(
       .on("click", (event, d) => {
         if (event.defaultPrevented) return; // dragged
         if(config.currentLayout === "default" && config.graphDataType === "parameter"){
+          allNodeMouseout();
           // default click (NN 1 search but staying in this layout)
           d3.select(event.currentTarget).raise();
           config.setNearestNeighbourDegree(1);
@@ -1390,47 +1424,32 @@ export default async function ForceGraph(
     // used in animation when NN flickering
     nodesGroup
       .select(".nodeBackgroundCircle")
-      .attr("opacity", (d) => getNodeAlpha(d.NAME, d.radiusVar,false))
       .attr("r", (d) => d.radius)
       .attr("fill", (d) => d.color)
       .attr("stroke", "white")
       .attr("stroke-width", 0)
       .attr("stroke-opacity", 0.7)
 
+    svg.selectAll(".nodeBackgroundCircle")
+      .classed("pulseNN", (d) => config.nearestNeighbourOrigin === "" ? false : config.nearestNeighbourOrigin === d.id)
+
+
+    const getNodeStrokeWidth = (node) => {
+      if(config.graphDataType === "parameter") return 0;
+      const hierarchyType = node.type || node.data.type;
+      return hierarchyType === "tier3" ? 0 : 1;
+    }
     nodesGroup
       .select(".nodeCircle")
-      .attr("opacity", (d) => getNodeAlpha(d.NAME, d.radiusVar,false))
       .attr("r", (d) => d.radius)
-      .attr("fill", (d) =>  d.color )
+      .attr("fill", (d) =>  d.color)
       .attr("stroke", "white")
-      .attr("stroke-width", (d) =>   getNodeStrokeElements("width",d))
-      .attr("stroke-opacity", (d) =>  getNodeStrokeElements("opacity",d))
+      .attr("stroke-width", getNodeStrokeWidth)
 
     svg.selectAll(".nodesGroup")
       .call(d3.drag()
         .on("drag", dragged)
         .on("end",dragended));
-
-    const pulseNNCircle = () => {
-      // node animation for NN origin
-      svg.selectAll(".nodeBackgroundCircle")
-        .attr("stroke-width", 0)
-        .filter((f) => f.NAME === config.nearestNeighbourOrigin)
-        .interrupt()
-        .transition()
-        .duration(300)
-        .attr("stroke-width", nodeHighlightStroke)
-        .transition()
-        .duration(300)
-        .attr("stroke-width", 0)
-        .on("end",() => {
-            pulseNNCircle();
-        })
-
-    }
-    if(config.nearestNeighbourOrigin !== "" && config.currentLayout === "default" && config.graphDataType === "parameter"){
-      pulseNNCircle();
-    }
 
     nodesGroup
       .select(".nodeLabel")
@@ -1627,21 +1646,23 @@ export default async function ForceGraph(
       // using notDefaultSelectedNodeNames as this is from a NN search
       listToShow = config.notDefaultSelectedNodeNames;
     }
+    // repeating declaration for tree NN
+    const expandedAll = config.allNodeNames.length === config.selectedNodeNames.length;
     if(mouseover){
       config.setTooltipRadio("none");
       tooltip.style("padding","0.4rem");
       let content = [];
       if(!d || !d.NAME) return;
       content.push(`<div style="pointer-events: none; background-color: ${d.color || d.COLOR} "><p style='text-align: center' >${d.NAME}</p></div>`); // tooltip title
-      const datum = nodes.find(node => node.NAME === d.NAME) || d;
+      const datum = showEle.nodes.find(node => node.NAME === d.NAME) || d;
 
       TOOLTIP_KEYS.forEach(key => {
         if(datum[key] && datum[key] !== ""){
-          content.push(`<div><b>${key}: </b><span>${datum[key]}</span></div>`);
+          content.push(`<div><b>${key.replace(/_/g, ' ')}: </b><span>${datum[key].replace(/_/g, ' ')}</span></div>`);
         }
       })
       if(d["parameterCount"]){
-        content.push(`<div><b>Connections: </b><span>${d.parameterCount}</span></div>`)
+        content.push(`<div><b>Node Count: </b><span>${d.parameterCount}</span></div>`)
       }
       content.map((d) => (contentStr += d));
     } else if (!expandedAll || (config.currentLayout !== "default" && config.graphDataType === "parameter")) {
@@ -1725,8 +1746,6 @@ export default async function ForceGraph(
         d3.selectAll(".tableCell").style("background-color","black");
         const rowId = event.currentTarget.id;
         const matchingNode = showEle.nodes.find((f) => f.NAME === rowId);
-        d3.selectAll(".nodeCircle")
-          .attr("stroke-width", (n) => n.NAME === rowId ? 8 : 0);
         d3.selectAll(`#${rowId}`)
           .style("background-color","#484848");
         let tooltipText = matchingNode["DISPLAY NAME"];
@@ -1741,7 +1760,6 @@ export default async function ForceGraph(
         }
       })
       .on("mouseout", () => {
-        d3.selectAll(".nodeCircle").attr("stroke-width",0)
         d3.selectAll(".tableCell").style("background-color","black");
         d3.selectAll(".nearestNeighbourLink").style("background-color","black");
         tooltipExtra.style("visibility","hidden");
@@ -1803,6 +1821,7 @@ export default async function ForceGraph(
         config.setNotDefaultSelectedLinks([]);
       }
       resetDefaultNodes();
+      resetMenuVisibility();
       updatePositions(true);
     } else {
       if(config.currentLayout === "nearestNeighbour"){
@@ -1838,6 +1857,7 @@ export default async function ForceGraph(
         d3.selectAll("#search-input")
           .property("value",config.shortestPathStart);
       }
+      resetMenuVisibility();
     }
     d3.selectAll(".dropdown-item").style("color", (d, i, objects) => {
       return config.currentLayout === objects[i].id ? "white" : "#808080";
@@ -1885,15 +1905,16 @@ export default async function ForceGraph(
             setTimeout(() => {
               resetMenuVisibility();
               drawTree();
+              resetNodeHighlight();
             }, 0); // or 16 for ~1 frame delay at 60fps
           } else if (config.currentLayout === "nearestNeighbour"){
             config.setNearestNeighbourOrigin("");
             config.setNotDefaultSelectedLinks([]);
-            renderNNLevelLabels([]);
             d3.select("#search-input").property("value","");
             d3.select("#search-input-sp-end").property("value","");
             d3.select("#infoMessage").text(MESSAGES.NN);
             config.setNotDefaultSelectedNodeNames([]);
+            updatePositions(false,false);
 
           } else if (config.currentLayout === "shortestPath"){
             config.setShortestPathStart("");
@@ -1902,11 +1923,11 @@ export default async function ForceGraph(
             d3.select("#search-input-sp-end").property("value","");
             d3.select("#infoMessage").text(MESSAGES.SP);
             config.setNotDefaultSelectedNodeNames([]);
+            updatePositions(false,false);
           }
         } else {
           location.reload();
         }
-        updatePositions(false,false);
       });
 
     const unselectButton =  d3.select("#unselectAll");
@@ -1923,8 +1944,7 @@ export default async function ForceGraph(
         config.setSelectedNodeNames([]);
         resetMenuVisibility();
         unselectButton.style("display","none");
-        updatePositions(false);
-
+        resetNodeHighlight();
       })
 
     const helpInfoButton = d3.select("#helpInfo");
@@ -1997,43 +2017,7 @@ export default async function ForceGraph(
       });
     }
 
-    const sliderRMin = document.getElementById('sliderRMin');
-    const displayRMin = document.getElementById('valueDisplayRMin');
 
-    if(sliderRMin && config.radiusMin){
-      sliderRMin.value = config.radiusMin || 1;
-      displayRMin.textContent = config.radiusMin || 1;
-
-      sliderRMin.addEventListener('input', (e) => {
-        const value = e.target.value;
-        displayRMin.textContent = value;
-        config.setRadiusMin(+value);
-        if(config.graphDataType === "parameter"){
-          nodeRadiusScale.range([config.radiusMin,config.radiusMax]);
-          showEle.nodes.map((m) => m.radius = nodeRadiusScale(m.radiusVar))
-        }
-      });
-    }
-
-
-
-    const sliderRMax = document.getElementById('sliderRMax');
-    const displayRMax = document.getElementById('valueDisplayRMax');
-
-    if(sliderRMax && config.radiusMax){
-      sliderRMax.value = config.radiusMax;
-      displayRMax.textContent = config.radiusMax;
-
-      sliderRMax.addEventListener('input', (e) => {
-        const value = e.target.value;
-        displayRMax.textContent = value;
-        config.setRadiusMax(+value);
-        if(config.graphDataType === "parameter"){
-          nodeRadiusScale.range([config.radiusMin,config.radiusMax]);
-          showEle.nodes.map((m) => m.radius = nodeRadiusScale(m.radiusVar))
-        }
-      });
-    }
 
 
     const sliderRMultiplier = document.getElementById('sliderRMultiplier');
@@ -2202,7 +2186,7 @@ export default async function ForceGraph(
         } else if(buttonId === "zoom-out"){
           performZoomAction(showEle.nodes, 500,"zoomOut")
         } else{
-          updatePositions(true);
+          performZoomAction(showEle.nodes, 500,"zoomFit")
         }
       })
     const layoutOptions = d3.selectAll(".dropdown-item")
@@ -2212,8 +2196,8 @@ export default async function ForceGraph(
     })
       .on("click", (event) => {
         // clear nearly new and move default -> selected if moving from nn or sp
-        renderNNLevelLabels([]);
         const newLayout = event.currentTarget.id;
+        if(newLayout === config.currentLayout) return;
         if(newLayout === "default" ){
           if(expandedAll && config.notDefaultSelectedNodeNames.length > 0){
             config.setSelectedNodeNames([]);
@@ -2240,11 +2224,12 @@ export default async function ForceGraph(
       const fuseOptions = {keys:  ["NAME","DEFINITION"], threshold:0.4};
       const fuse = new Fuse(fuseData, fuseOptions);
       const result = fuse.search(input);
+
       // from Chat GPT (with some help)
       // If you want exact matches to come at the very top, you can filter first for exact matches
       const exactMatches = result.filter(m => m.item.NAME.toLowerCase().startsWith(input.toLowerCase()));
       const nonExactMatches = result.filter(m => !m.item.NAME.startsWith(input))
-        .sort((a,b) => a.item.NAME.toLowerCase().localeCompare(b.item.NAME.toLowerCase()));
+       // .sort((a,b) => a.item.NAME.toLowerCase().localeCompare(b.item.NAME.toLowerCase()));
       // Combine exact matches with non-exact matches
       const finalResults = [...exactMatches, ...nonExactMatches];
       return finalResults.map((m) => m.item);
