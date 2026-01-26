@@ -398,11 +398,6 @@ export default async function ForceGraph(
   // node visibility can depend on zoom level
   const getNodeLabelDisplay = (d) => {
     if(config.graphDataType !== "parameter") return "block";
-   // if((config.graphDataType !== "parameter" && d.type !== "tier3") || config.currentLayout === "shortestPath") return "block";
-   // if(config.currentLayout === "nearestNeighbour") return "block";
-   // if(config.currentLayout === "default" && !expandedAll) {
-   //   return config.selectedNodeNames.includes(d.id) ? "block" : "none";
-   // }
     if(d.NAME === config.nearestNeighbourOrigin || config.currentLayout === "shortestPath") return "block";
     return currentZoomLevel > 2 ? "block":"none";
   }
