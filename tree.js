@@ -1,33 +1,45 @@
 import * as d3 from "d3";
-import {  COLOR_SCALE_RANGE } from "./constants";
+import { COLOR_SCALE_RANGE, MESSAGES } from "./constants";
 import { config } from "./config";
+import {zoomToFit} from "./graph-d3";
 import ForceGraph from "./graph-d3";
 
 const mainAppContainerSelector = "#app";
+export const resetNodeHighlight = () => {
+  const expandedAll = config.selectedNodeNames.length === config.allNodeNames.length;
+
+  const svg = d3.select(".chartGroup");
+  svg.selectAll(".nodeOpacityCircle")
+    .attr("opacity", (d) => expandedAll || config.currentLayout !== "default" ? 1 :
+      config.selectedNodeNames.includes(d.NAME) ? 1 : 0.2)
+
+}
+export function getUrlId (str)  {
+  const hasCapital  = /[A-Z]/.test(str);
+  return hasCapital ? `~${str}` : str;
+}
+
 // functions to render graph when ready (or after a collapsible tree change)
 const getGraphData = () => {
   if(config.graphDataType === "parameter") return config.parameterData;
   if(config.graphDataType === "segment") return {nodes: config.hierarchyData["segmentNodes"], links: []};
   return {nodes: config.hierarchyData["subModuleNodes"],links: []};
 }
+export const getColorScale = () => d3.scaleOrdinal(config.hierarchyData.subModuleNames, COLOR_SCALE_RANGE);
+const colorScale = getColorScale();
 
-const getSubModulePositions = () => {
-
-  const subModulePositions =  config.hierarchyData.subModuleNames.reduce((acc, entry,index) => {
-    acc.push({
+const getSubModuleColours = () =>  config.hierarchyData.subModuleNames.reduce((acc, entry,index) => {
+  acc.push({
       name: entry,
-      fill: COLOR_SCALE_RANGE[index]
+      fill: colorScale(entry)
     })
     return acc;
   },[]);
-
-  return subModulePositions;
-}
-export const renderGraph = (initial) => {
+export const renderGraph = (initial, nearestNeighbour) => {
 
   const graphData = getGraphData();
 
- const subModulePositions = getSubModulePositions(window.innerWidth, window.innerHeight)
+ const subModuleColors = getSubModuleColours(window.innerWidth, window.innerHeight)
   // Execute the function to generate a new network
   ForceGraph(
     graphData,
@@ -36,11 +48,12 @@ export const renderGraph = (initial) => {
       initial,
       width: window.innerWidth,
       height: window.innerHeight,
-      subModulePositions
+      subModuleColors,
+      nearestNeighbour
     }
   );
 }
-export const getColorScale = () => d3.scaleOrdinal(config.hierarchyData.subModuleNames, COLOR_SCALE_RANGE);
+
 
 // constants for drawTree function
 // From https://fontawesome.com/
@@ -53,8 +66,120 @@ const standardViewBox = "0 0 448 512"
 const allSelectedPath = "M64 80c-8.8 0-16 7.2-16 16l0 320c0 8.8 7.2 16 16 16l320 0c8.8 0 16-7.2 16-16l0-320c0-8.8-7.2-16-16-16L64 80zM0 96C0 60.7 28.7 32 64 32l320 0c35.3 0 64 28.7 64 64l0 320c0 35.3-28.7 64-64 64L64 480c-35.3 0-64-28.7-64-64L0 96zM337 209L209 337c-9.4 9.4-24.6 9.4-33.9 0l-64-64c-9.4-9.4-9.4-24.6 0-33.9s24.6-9.4 33.9 0l47 47L303 175c9.4-9.4 24.6-9.4 33.9 0s9.4 24.6 0 33.9z"
 const partSelectedPath = "M64 80c-8.8 0-16 7.2-16 16l0 320c0 8.8 7.2 16 16 16l320 0c8.8 0 16-7.2 16-16l0-320c0-8.8-7.2-16-16-16L64 80zM0 96C0 60.7 28.7 32 64 32l320 0c35.3 0 64 28.7 64 64l0 320c0 35.3-28.7 64-64 64L64 480c-35.3 0-64-28.7-64-64L0 96zM152 232l144 0c13.3 0 24 10.7 24 24s-10.7 24-24 24l-144 0c-13.3 0-24-10.7-24-24s10.7-24 24-24z"
 const noneSelectedPath = "M384 80c8.8 0 16 7.2 16 16l0 320c0 8.8-7.2 16-16 16L64 432c-8.8 0-16-7.2-16-16L48 96c0-8.8 7.2-16 16-16l320 0zM64 32C28.7 32 0 60.7 0 96L0 416c0 35.3 28.7 64 64 64l320 0c35.3 0 64-28.7 64-64l0-320c0-35.3-28.7-64-64-64L64 32z"
-const colorScale = getColorScale();
 const iconWidthHeight = 16;
+
+const newNN = (newNN) => {
+  config.setShortestPathString("");
+  // whether from search box or node name
+  // required behaviour is NN degree 1
+  config.setNearestNeighbourOrigin(newNN);
+  config.setSelectedNodeNames([]);
+  d3.select("#search-input").property("value",newNN)
+  setTimeout(() => {
+    renderGraph(false, true);
+  }, 0); // or 16 for ~1 frame delay at 60fps
+}
+
+const changeTreeSelection = (d) => {
+  config.setNearestNeighbourOrigin("");
+  config.setTooltipRadio("none");
+  d3.selectAll(".nodeBackgroundCircle")
+    .classed("pulseNN", false)
+  //reset url to blank
+  history.replaceState(null, '', window.location.href.split("?")[0]);
+  d3.select("#search-input").property("value","");
+  if(d.data.type === "tier3") {
+    if (config.selectedNodeNames.includes(d.data.NAME)) {
+      // tier 3 (chart nodes) - currently selected
+      // unselect all descendants
+      config.setSelectedNodeNames(config.selectedNodeNames.filter((f) =>  f !== d.data.NAME))
+    } else {
+      // tier 3 (chart nodes) - current unselected;
+      config.addToSelectedNodeNames(d.data.NAME);
+    }
+  } else {
+    const descendants = config.tier1And2Mapper[d.data.id];
+    const selectedPath = getSelectedPath(descendants);
+    if(selectedPath === allSelectedPath){
+      config.setSelectedNodeNames(config.selectedNodeNames.filter((f) => !descendants.includes(f)))
+    } else {
+      // part or none selected === all all
+      descendants.forEach((t) => {
+        config.addToSelectedNodeNames(t);
+      })
+    }
+  }
+  config.setShortestPathString("");
+  resetNodeHighlight();
+  const baseSvg = d3.select(mainAppContainerSelector).select("svg");
+  zoomToFit(baseSvg,"all",300);
+}
+
+const changeChartViewType = (svg, selectedNodeNamesCopy,event) => {
+  const currentLayout = event.currentTarget.value;
+  const baseUrl = window.location.href.split("?")[0];
+  if(currentLayout === "segment"){
+    history.replaceState(null, '', `${baseUrl}\?view=meso`);
+  } else if (currentLayout === "parameter"){
+    history.replaceState(null, '', `${baseUrl}\?view=variable`);
+  } else {
+    history.replaceState(null, '', baseUrl);
+  }
+  d3.select(".animation-container").style("display", "flex");
+  d3.select(".tooltip").style("visibility","hidden");
+  d3.selectAll("#search-input").property("value","");
+  d3.select("#collapsibleMenuToggle")
+    .style("display",currentLayout === "parameter" ? "block" : "none");
+  config.setShortestPathString("");
+
+  config.setGraphDataType(currentLayout);
+  config.setNearestNeighbourOrigin("");
+  config.setTooltipRadio("none");
+  config.setCurrentLayout("default");
+  config.setExpandedMacroMesoNodes([]);
+  config.setMacroMesoUrlExtras([]);
+  const getSelectedNames = () => {
+    if(config.graphDataType === "parameter") return selectedNodeNamesCopy;
+    if(config.graphDataType === "submodule") return config.hierarchyData.subModuleNames;
+    return config.hierarchyData.segmentNames;
+  }
+  const selectedNames = getSelectedNames();
+  const nodeNamesCopy = JSON.parse(JSON.stringify(selectedNames));
+  config.setSelectedNodeNames(nodeNamesCopy);
+  svg.selectAll(".selectedCheckboxIcon").style("display",config.graphDataType === "parameter" ? "block" : "none")
+  svg.selectAll(".selectedCheckboxIconPath")
+    .attr("d", (d) => getSelectedPath(d.data.type === "tier3" ? [d.data.NAME] : config.tier1And2Mapper[d.data.id]))
+  if(currentLayout === "parameter"){
+    if(config.clickedMMVariable !== ""){
+      config.setNearestNeighbourOrigin(config.clickedMMVariable);
+      config.setMMClickedVariable("");
+    }
+  }
+  setTimeout(() => {
+    renderGraph(config.graphDataType !== "parameter", false);
+  }, 0); // or 16 for ~1 frame delay at 60fps
+}
+
+const toggleShowParameters = (event) => {
+
+  d3.select(".animation-container").style("display", "flex");
+  const showParameters = event.target.checked;
+  config.setShowParameters(showParameters);
+  config.setCurrentLayout("default");
+  config.setShortestPathString("");
+  config.setSelectedNodeNames(config.allNodeNames);
+  config.setNotDefaultSelectedLinks([]);
+  config.setNotDefaultSelectedNodeNames([]);
+  config.setNearestNeighbourOrigin("");
+  config.setShortestPathStart("");
+  config.setShortestPathEnd("");
+  config.setTooltipRadio("none");
+  setTimeout(() => {
+    renderGraph(config.graphDataType !== "parameter");
+  }, 0); // or 16 for ~1 frame delay at 60fps
+
+}
+
 
 export const remToPx = (rem) =>{
   // converts rem to px so we can maintain re-sizing
@@ -82,7 +207,6 @@ export const drawTree = () => {
 
   const depthExtra = (depth, increment) => (depth -1) * increment;
 
-
   const currentTreeData = config.currentTreeData;
   const svg =  d3.select(`.${treeDivId}_svg`);
   const treeHeight = marginTop + (currentTreeData.descendants().length * rowHeight);
@@ -90,6 +214,7 @@ export const drawTree = () => {
 
   let chartData = currentTreeData.descendants()
     .filter((f) => f.depth > 0)
+    .filter((f) => config.showParameters ? f : !f.data.isParameter)
     .sort((a,b) => d3.ascending(a.data.hOrderPosition, b.data.hOrderPosition));
 
   if(!config.showSingleNodes){
@@ -150,21 +275,8 @@ export const drawTree = () => {
     .attr("cursor",(d) => d.data.type === "tier3" ? "pointer": "default")
     .on("click", (event, d) => {
       if(d.data.type === "tier3"){
-        config.setNearestNeighbourOrigin(d.data.NAME);
-        config.setTooltipRadio("none");
-        d3.select("#search-input").property("value",d.data.name);
-        config.setSelectedNodeNames(config.allNodeNames)
-        config.setNotDefaultSelectedLinks([]);
-        config.setNotDefaultSelectedNodeNames([]);
-        config.setShortestPathStart("");
-        config.setShortestPathEnd("");
-        config.setShortestPathString("");
-        d3.select(".animation-container").style("display", "flex");
-        setTimeout(() => {
-          renderGraph(false);
-        }, 0); // or 16 for ~1 frame delay at 60fps
+        newNN(d.data.NAME);
       }
-
     });
 
   treeGroup.select(".verticalLine")
@@ -206,39 +318,9 @@ export const drawTree = () => {
     .attr("height", rowHeight)
     .attr("fill","transparent")
     .on("click",(event, d) => {
-      config.setNearestNeighbourOrigin("");
-      config.setTooltipRadio("none");
-      //reset url to blank
-      history.replaceState(null, '', window.location.href.split("?")[0]);
-      d3.select("#search-input").property("value","");
-      if(d.data.type === "tier3") {
-        if (config.selectedNodeNames.includes(d.data.NAME)) {
-          // tier 3 (chart nodes) - currently selected
-          // unselect all descendants
-          config.setSelectedNodeNames(config.selectedNodeNames.filter((f) =>  f !== d.data.NAME))
-        } else {
-          // tier 3 (chart nodes) - current unselected;
-          config.addToSelectedNodeNames(d.data.NAME);
-        }
-      } else if (config.graphDataType === "parameter"){
-        const descendants = config.tier1And2Mapper[d.data.id];
-        const selectedPath = getSelectedPath(descendants);
-        if(selectedPath === allSelectedPath){
-          config.setSelectedNodeNames(config.selectedNodeNames.filter((f) => !descendants.includes(f)))
-        } else {
-          // part or none selected === all all
-          descendants.forEach((t) => {
-            config.addToSelectedNodeNames(t);
-          })
-        }
-      }
-      config.setCurrentTreeData(currentTreeData);
-      config.setShortestPathString("");
-      drawTree();
-      d3.select(".animation-container").style("display", "flex");
-      setTimeout(() => {
-        renderGraph(false);
-      }, 0); // or 16 for ~1 frame delay at 60fps
+        changeTreeSelection(d)
+        config.setCurrentTreeData(currentTreeData);
+        drawTree();
     });
 
   d3.select(".animation-container").style("display", "none");
@@ -351,7 +433,6 @@ export default function VariableTree(data) {
   // append tree svg if there is one
   let svg = d3.select(`.${treeDivId}_svg`);
   if(svg.node() === null) {
-
     svg = d3.select(`#${treeDivId}`)
       .append("svg")
       .attr("class",`${treeDivId}_svg`)
@@ -364,7 +445,7 @@ export default function VariableTree(data) {
   }
 
   drawTree();
-  renderGraph(true);
+  renderGraph(true,false);
 
   // finally, set various buttons
 
@@ -383,61 +464,14 @@ export default function VariableTree(data) {
   // chart data radio - parameter, submodule, segment
   d3.selectAll(".chartDataRadio")
     .on("change", (event) =>  {
-      const currentLayout = event.currentTarget.value;
-      const baseUrl = window.location.href.split("?")[0];
-      if(currentLayout === "segment"){
-        history.replaceState(null, '', `${baseUrl}\?view=meso`);
-      } else if (currentLayout === "parameter"){
-        history.replaceState(null, '', `${baseUrl}\?view=variable`);
-      } else {
-        history.replaceState(null, '', baseUrl);
-      }
-      d3.select(".animation-container").style("display", "flex");
-      d3.select(".tooltip").style("visibility","hidden");
-      d3.selectAll("#search-input").property("value","");
-       d3.select("#collapsibleMenuToggle")
-        .style("display",currentLayout === "parameter" ? "block" : "none");
-      config.setShortestPathString("");
-
-      config.setGraphDataType(currentLayout);
-      config.setNearestNeighbourOrigin("");
-      config.setTooltipRadio("none");
-      config.setCurrentLayout("default");
-      config.setExpandedMacroMesoNodes([]);
-      config.setMacroMesoUrlExtras([]);
-      const getSelectedNames = () => {
-        if(config.graphDataType === "parameter") return selectedNodeNamesCopy;
-        if(config.graphDataType === "submodule") return config.hierarchyData.subModuleNames;
-        return config.hierarchyData.segmentNames;
-      }
-      const selectedNames = getSelectedNames();
-      const nodeNamesCopy = JSON.parse(JSON.stringify(selectedNames));
-      config.setSelectedNodeNames(nodeNamesCopy);
-      svg.selectAll(".selectedCheckboxIcon").style("display",config.graphDataType === "parameter" ? "block" : "none")
-      svg.selectAll(".selectedCheckboxIconPath")
-        .attr("d", (d) => getSelectedPath(d.data.type === "tier3" ? [d.data.NAME] : config.tier1And2Mapper[d.data.id]))
-      if(currentLayout === "parameter"){
-        if(config.clickedMMVariable !== ""){
-          config.setNearestNeighbourOrigin(config.clickedMMVariable);
-          config.setMMClickedVariable("");
-        }
-      }
-      setTimeout(() => {
-        renderGraph(config.graphDataType !== "parameter");
-      }, 0); // or 16 for ~1 frame delay at 60fps
-
+       changeChartViewType(svg, selectedNodeNamesCopy,event);
     });
 
 
   const showParameters = d3.select("#viewParams");
 
   showParameters.on("change",(event) => {
-    d3.select(".animation-container").style("display", "flex");
-    const showParameters = event.target.checked;
-    config.setShowParameters(showParameters);
-    setTimeout(() => {
-      renderGraph(config.graphDataType !== "parameter");
-    }, 0); // or 16 for ~1 frame delay at 60fps
+    toggleShowParameters(event);
   })
 
   // collapse expand button
@@ -460,7 +494,6 @@ export default function VariableTree(data) {
       setTimeout(() => {
         drawTree();
       }, 0); // or 16 for ~1 frame delay at 60fps
-
     });
 
   // and handle resizing
@@ -491,5 +524,4 @@ export default function VariableTree(data) {
 
 // Add throttled event listener which redraws the tree every 0.1 second rather than nanosecond
   window.addEventListener("resize", resizeThrottle(handleResize, 100));
-
 }

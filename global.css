@@ -756,3 +756,19 @@ input[type="range"] {
     margin-top: 0;            /* remove any extra top margin */
     margin-bottom: 0;
 }
+
+@keyframes pulseNN {
+    0% {
+        stroke-width: 0;
+    }
+    50% {
+        stroke-width: 10px;
+    }
+    100% {
+        stroke-width: 0;
+    }
+}
+
+.pulseNN {
+    animation: pulseNN 1s ease-in-out infinite;
+}
