@@ -35,7 +35,7 @@ const getSubModuleColours = () =>  config.hierarchyData.subModuleNames.reduce((a
     })
     return acc;
   },[]);
-export const renderGraph = (initial, nearestNeighbour) => {
+export const renderGraph = (initial, nearestNeighbour, nnViewChange = false ) => {
 
   const graphData = getGraphData();
 
@@ -131,7 +131,6 @@ const changeChartViewType = (svg, selectedNodeNamesCopy,event) => {
   d3.select("#collapsibleMenuToggle")
     .style("display",currentLayout === "parameter" ? "block" : "none");
   config.setShortestPathString("");
-
   config.setGraphDataType(currentLayout);
   config.setNearestNeighbourOrigin("");
   config.setTooltipRadio("none");
@@ -174,6 +173,7 @@ const toggleShowParameters = (event) => {
   config.setShortestPathStart("");
   config.setShortestPathEnd("");
   config.setTooltipRadio("none");
+  resetNodeHighlight();
   setTimeout(() => {
     renderGraph(config.graphDataType !== "parameter");
   }, 0); // or 16 for ~1 frame delay at 60fps

@@ -198,7 +198,8 @@ export default async function ForceGraph(
     width = 640, // outer width, in pixels
     height = 400, // outer height, in pixels
     subModuleColors, // name, fill,
-    nearestNeighbour
+    nearestNeighbour,
+    nnViewChange = false
 
   } = {}
 ) {
@@ -497,9 +498,9 @@ export default async function ForceGraph(
       simulation.alphaTarget(0.1).restart();
       simulation.tick(1);
       simulation.stop();
-
     }
     updatePositions(true);
+
   } else {
     // initial build
     // set links
@@ -518,7 +519,11 @@ export default async function ForceGraph(
       }, {})
       config.setDefaultNodePositions(defaultNodePositions)
     }
-    updatePositions(true );
+    if(config.currentLayout === "default" && config.nearestNeighbourOrigin !== ""){
+      positionNearestNeighbours(true,true)
+    } else {
+      updatePositions(true );
+    }
   }
 
 
@@ -626,7 +631,7 @@ export default async function ForceGraph(
 
     return {nnWidth, nnHeight};
   }
-  function positionNearestNeighbours(nodeClick) {
+  function positionNearestNeighbours(nodeClick, initialDraw = false) {
     // duplicating here for call from tree.
     const svg = d3.select(".chartGroup");
     const baseSvg = d3.select(".baseSvg");
@@ -767,7 +772,7 @@ export default async function ForceGraph(
     const nnUrl = `${windowBaseUrl}?${config.currentLayout === "default" ? "NND" :"NNV"}=${getUrlId(config.nearestNeighbourOrigin)}:${config.nearestNeighbourDegree}`;
     history.replaceState(null, '', nnUrl);
     resetMenuVisibility();
-    if(config.currentLayout === "default"){
+    if(config.currentLayout === "default" && !initialDraw){
       resetNodeHighlight()
       svg.selectAll(".nodeBackgroundCircle")
         .classed("pulseNN", (d) =>  config.nearestNeighbourOrigin === d.id)
@@ -781,7 +786,6 @@ export default async function ForceGraph(
       const currentNode = showEle.nodes.find((f) => f.id === config.nearestNeighbourOrigin)
       updateTooltip(currentNode,false);
       d3.select(".animation-container").style("display", "none");
-
     } else {
       updatePositions(true,nodeClick);
     }
