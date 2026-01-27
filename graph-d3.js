@@ -530,8 +530,9 @@ export default async function ForceGraph(
 
   let searchNodes = showEle.nodes;
   if(!config.showParameters){
-    searchNodes = searchNodes.filter((f) => !f.isParameter);
+    searchNodes = searchNodes.filter((f) => !(f.isParameter));
   }
+
   // Update search box with searchable items
   updateSearch(searchNodes, graph, "");
   updateSearch(searchNodes, graph, "-sp-end");
@@ -2241,7 +2242,11 @@ export default async function ForceGraph(
 
     // Function to filter suggestions based on user input
     const  filterSuggestions = (input) => {
-      const fuseData = config.graphDataType === "parameter" ? variableData : config.parameterData.nodes;
+      let filteredNodes = config.parameterData.nodes;
+      if(!config.showParameters){
+        filteredNodes = filteredNodes.filter((f) => !f.isParameter);
+      }
+      const fuseData = config.graphDataType === "parameter" ? variableData : filteredNodes;
       const fuseOptions = {keys:  ["NAME","DEFINITION"], threshold:0.4};
       const fuse = new Fuse(fuseData, fuseOptions);
       const result = fuse.search(input);
