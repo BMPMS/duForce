@@ -531,9 +531,9 @@ async function getData() {
 
 // cheat because main.js was calling twice and didn't want to waste your time debugging at this stage
 if(!config.initialLoadComplete){
-   //getConvertedData();
+   getConvertedData();
 
-     getData();
+   //  getData();
 
   // Instructions to upload new data
 
