@@ -2247,7 +2247,7 @@ export default async function ForceGraph(
         filteredNodes = filteredNodes.filter((f) => !f.isParameter);
       }
       const fuseData = config.graphDataType === "parameter" ? variableData : filteredNodes;
-      const fuseOptions = {keys:  ["NAME","DEFINITION"], threshold:0.4};
+      const fuseOptions = {keys:  ["NAME", "DISPLAY_NAME","DEFINITION"], threshold:0.4};
       const fuse = new Fuse(fuseData, fuseOptions);
       const result = fuse.search(input);
 
