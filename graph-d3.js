@@ -16,7 +16,7 @@ import { dijkstra } from "graphology-shortest-path";
 
 let zoom = d3.zoom();
 let showEle;
-
+let expandedAll = true;
 const getLinkPath = (d) => {
   // custom path to account for source + target radii so arrows will be visible
   const path = d3.select(`#arrowLinkPath${d.index}`).node();
@@ -40,7 +40,7 @@ const drawChartLinks = (svg, chartLinks) => {
   }
 
   const getLinkAlpha = (link, linkLength) => {
-    const expandedAll = config.selectedNodeNames.length === config.allNodeNames.length;
+    expandedAll = config.selectedNodeNames.length === config.allNodeNames.length;
     if(linkLength < 100) return 0.9;
     if(linkLength <= 2000 ) return 0.75;
     const linkOpacity =  0.5;
@@ -63,6 +63,7 @@ const drawChartLinks = (svg, chartLinks) => {
   // standard link which to create custom path in getLinkPath
   linksGroup
     .select(".linkPathForArrows")
+    .style("display","block")
     .attr("id", (d) => `arrowLinkPath${d.index}`)
     .attr("pointer-events", "none")
     .attr("stroke", "transparent")
@@ -72,6 +73,7 @@ const drawChartLinks = (svg, chartLinks) => {
   // visible link
   linksGroup
     .select(".linkPath")
+    .style("display","block")
     .attr("pointer-events", "none")
     .attr("stroke-opacity", (d) => getLinkAlpha(d,chartLinks.length))
     .attr("stroke-width", config.graphDataType === "parameter" ? 0.75 : 1.25)
@@ -126,6 +128,7 @@ export const zoomToFit = (baseSvg,currentNodes, transitionTime) => {
 }
 
 const resetMenuVisibility = () => {
+  expandedAll = config.selectedNodeNames.length === config.allNodeNames.length;
   let buttonPosition = 2.9;
   const menuVisible = d3.select("#hideInfo").style("display") === "block";
   d3.select("unselectAll").style("display","none");
@@ -185,6 +188,8 @@ const resetMenuVisibility = () => {
   d3.select("#resetButton").style("top",`${buttonPosition + 0.8}rem`);
   d3.select("#search-tab-container").style("height", searchTabContainerHeight);
   d3.selectAll(".nnLabelGroup").attr("display",config.currentLayout === "nearestNeighbour" ? "block" : "none")
+  d3.select("#resetButton").style("display",expandedAll ? "none" : "block");
+
 }
 
 export default async function ForceGraph(
@@ -203,6 +208,7 @@ export default async function ForceGraph(
 
   } = {}
 ) {
+  expandedAll = config.graphDataType !== "parameter" || config.allNodeNames.length === config.selectedNodeNames.length;
   if(nearestNeighbour){
     positionNearestNeighbours(true);
   }
@@ -218,7 +224,6 @@ export default async function ForceGraph(
   if (!nodes) return;
   const windowBaseUrl = window.location.href.split("?")[0];
   resetMenuVisibility(width);
-  let expandedAll = config.graphDataType !== "parameter" || nodes.length === config.selectedNodeNames.length;
   // data for charts
   showEle = { nodes, links};
 
@@ -519,17 +524,17 @@ export default async function ForceGraph(
       }, {})
       config.setDefaultNodePositions(defaultNodePositions)
     }
-    if(config.currentLayout === "default" && config.nearestNeighbourOrigin !== ""){
-      positionNearestNeighbours(true,true)
-    } else {
-      updatePositions(true );
-    }
+    updatePositions(true );
+
   }
 
-
+  let searchNodes = showEle.nodes;
+  if(!config.showParameters){
+    searchNodes = searchNodes.filter((f) => !f.isParameter);
+  }
   // Update search box with searchable items
-  updateSearch(showEle.nodes, graph, "");
-  updateSearch(showEle.nodes, graph, "-sp-end");
+  updateSearch(searchNodes, graph, "");
+  updateSearch(searchNodes, graph, "-sp-end");
   // updateButtons
   updateButtons(graph);
 
@@ -995,7 +1000,7 @@ export default async function ForceGraph(
     }
 
     // reset expandedAll
-    expandedAll = config.graphDataType !== "parameter" || showEle.nodes.length === config.selectedNodeNames.length;
+    expandedAll = config.graphDataType !== "parameter" || config.allNodeNames.length === config.selectedNodeNames.length;
     d3.select("#resetButton").style("display",expandedAll ? "none" : "block");
 
     if(config.graphDataType === "parameter" && config.currentLayout === "nearestNeighbour"){
@@ -1034,6 +1039,9 @@ export default async function ForceGraph(
          chartNodes.some((s) => s.NAME === getTargetId(f)));
     } else if (chartLinks.length > 2500){
       chartLinks = selectSpatiallyEvenLinks(showEle.links,chartNodes,2000);
+      if(config.allNodeNames.length === config.selectedNodeNames.length){
+        config.setVisibleVariableLinks(chartLinks);
+      }
     }
 
     if(config.graphDataType !== "parameter" && !afterDrag) {
@@ -1087,13 +1095,13 @@ export default async function ForceGraph(
       expandedSegments.forEach((segment) => {
         // for each segment
         // fetch submodule from current simulation (for position)
-        const segmentNode = showEle.nodes.find((f) => f.data.id === segment);
+        const segmentNode = showEle.nodes.find((f) => f.data?.id || f.id === segment);
         if(segmentNode){
           // simulate a click and re-run simulation
           clickMacroMeso(segmentNode);
         }
       })
-      config.setMMClickedVariable("");
+
       const clickParameter = (parameterNode, updateUrl) => {
         if(!parameterNode) return;
         // if node exist - 'click it' and reset url string
@@ -1140,6 +1148,16 @@ export default async function ForceGraph(
 
     const visibleNodeIds = showEle.nodes.map((m) => m.id);
 
+    if(config.clickedMMVariable !== ""){
+      if(!visibleNodeIds.includes(config.clickedMMVariable)){
+        config.setMMClickedVariable("");
+      } else {
+        const clickedNode = showEle.nodes.find((f) => f.id === config.clickedMMVariable);
+        clickedNode.clicked = true;
+        d3.select(`#search-input`).property("value", config.clickedMMVariable);
+
+      }
+    }
     chartLinks =  mmLinks
       .filter((f) => visibleNodeIds.includes(f.source) && visibleNodeIds.includes(f.target))
       .map(f => ({ ...f }));
@@ -1258,7 +1276,6 @@ export default async function ForceGraph(
           group: descendant.data.type === "tier3" ? descendant.data.parent : descendant.data.subModule,
           parent: descendant.parent.data.id,
           subModule: descendant.data.subModule,
-          data: {links: descendant.data.links},
           type,
           x,
           y
@@ -1309,10 +1326,10 @@ export default async function ForceGraph(
             macroOrMesoHighlight(d);
           }
           let tooltipNode = {
-            NAME: d.data.NAME || d.name,
-            DISPLAY_NAME: d.data.DISPLAY_NAME || d.DISPLAY_NAME,
+            NAME: d.data?.NAME || d.name,
+            DISPLAY_NAME: d.data?.DISPLAY_NAME || d.DISPLAY_NAME,
             COLOR: d.color,
-            parameterCount: d.data.parameterCount || d.parameterCount
+            parameterCount: d.data?.parameterCount || d.parameterCount
           }
           const hierarchyType = d.type || d.data.type;
           if(hierarchyType === "tier2"){
@@ -1370,7 +1387,7 @@ export default async function ForceGraph(
         // do nothing on click if NN or SP layout
         // add segment when ready
         if(config.graphDataType !== "parameter"){
-          d3.select(`#search-input`).node().value = "";
+          d3.select(`#search-input`).property("value","")
           d3.select(".tooltipExtra").style("visibility","hidden");
           allNodeMouseout();
           if (isNormalClick(event)) {
@@ -1396,7 +1413,7 @@ export default async function ForceGraph(
                 config.setExpandedMacroMesoNodes(config.expandedMacroMesoNodes.concat(d.id))
                 let urlString = `${windowBaseUrl}?${config.graphDataType === "submodule" ? "QV" : "MV"}=${getUrlId(d.id)}`;
                 history.replaceState(null, '', urlString);
-                d3.select(`#search-input`).node().value = d.id;
+                d3.select(`#search-input`).property("value",d.id);
               }
             }
           } else if (d.type === "tier3") {
@@ -1407,7 +1424,7 @@ export default async function ForceGraph(
             showEle.nodes.push(getNewMacroMesoNode(d.parent, d.x, d.y, "tier2"));
             config.setExpandedMacroMesoNodes(config.expandedMacroMesoNodes.filter((f) => f !== d.parent));
             updatePositions(true);
-          } else if (d.type === "tier2") {
+          } else if (d.data?.type === "tier2" || d.type === "tier2") {
             // shift/alt/command click + tier 2
             // delete all with matching subModule
             showEle.nodes = showEle.nodes.filter((f) => f.subModule !== d.subModule);
@@ -1507,6 +1524,9 @@ export default async function ForceGraph(
       setTimeout(() => {
         svg.selectAll(".nodeLabel").style("display", (l) => l.id === clickedNode.id ? "block" : getNodeLabelDisplay(l))
       },0)
+    }
+    if(nnViewChange){
+      positionNearestNeighbours(true)
     }
 
 
@@ -1886,6 +1906,9 @@ export default async function ForceGraph(
 
     d3.select("#resetButton")
       .on("click",(event) => {
+        d3.select("#search-input").property("value","");
+        d3.select("#search-input-sp-end").property("value","");
+        svg.selectAll(".nodeBackgroundCircle").classed("pulseNN",false);
         if(config.graphDataType === "parameter"){
           if(config.currentLayout === "default"){
             d3.select(".animation-container").style("display", "flex");
@@ -1904,13 +1927,12 @@ export default async function ForceGraph(
             setTimeout(() => {
               resetMenuVisibility();
               drawTree();
+              drawChartLinks(svg, config.visibleVariableLinks);
               resetNodeHighlight();
             }, 0); // or 16 for ~1 frame delay at 60fps
           } else if (config.currentLayout === "nearestNeighbour"){
             config.setNearestNeighbourOrigin("");
             config.setNotDefaultSelectedLinks([]);
-            d3.select("#search-input").property("value","");
-            d3.select("#search-input-sp-end").property("value","");
             d3.select("#infoMessage").text(MESSAGES.NN);
             config.setNotDefaultSelectedNodeNames([]);
             updatePositions(false,false);
