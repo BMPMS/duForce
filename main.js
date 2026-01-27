@@ -152,8 +152,11 @@ const setHierarchyData = (nodesCopy, resultEdges,parameterOnlyHierarchy) => {
   const getOppositeData = (leaves) => {
     // set of parameters which belong to this submodule OR segment
     const parameterSet = leaves.map((m) => m.data.id);
+    const variableOnly = leaves
+      .filter((f) => !f.data.isParameter)
+      .map((m) => m.data.id)
     const linkCount = resultEdges
-      .filter((f) => parameterSet.includes(f.source) ||  parameterSet.includes(f.target))
+      .filter((f) => variableOnly.includes(f.source) ||  variableOnly.includes(f.target))
       .length;
     // currently in the data all edge direction is OUT
     const edgeDirection = [...new Set(resultEdges.map((m) => m.direction))]
@@ -227,11 +230,13 @@ const setHierarchyData = (nodesCopy, resultEdges,parameterOnlyHierarchy) => {
         matchingLink.direction = "both";
       }
     } else {
-      acc.push({
-        source: currentId,
-        target: target,
-        direction: link.direction
-      })
+      if(currentId !== target){
+        acc.push({
+          source: currentId,
+          target: target,
+          direction: link.direction
+        })
+      }
     }
     return acc;
     },[])
@@ -528,7 +533,7 @@ async function getData() {
 if(!config.initialLoadComplete){
    getConvertedData();
 
-    // getData();
+   //  getData();
 
   // Instructions to upload new data
 
