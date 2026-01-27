@@ -37,6 +37,7 @@ export const config = {
   tooltipRadio: "none", // used to toggle visibility of tooltipRadio button visible on NN
   macroMesoUrlExtras: [],
   nnUrlView: false,
+  visibleVariableLinks:[],
   // config constants testing variables
   radiusMin: NODE_RADIUS_RANGE[0],
   radiusMax: NODE_RADIUS_RANGE[1],
@@ -47,6 +48,13 @@ export const config = {
   labelRem: LABEL_FONT_BASE_REM,
   showParameters: false,
   clickedMMVariable: "",
+  setVisibleVariableLinks(newArray) {
+    if (typeof newArray === "object") {
+      this.visibleVariableLinks = newArray;
+    } else {
+      console.error("Expected an array for visibleVariableLinks.");
+    }
+  },
   setMMClickedVariable(newString) {
     if (typeof newString === "string") {
       this.clickedMMVariable = newString;

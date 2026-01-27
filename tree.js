@@ -49,7 +49,8 @@ export const renderGraph = (initial, nearestNeighbour, nnViewChange = false ) =>
       width: window.innerWidth,
       height: window.innerHeight,
       subModuleColors,
-      nearestNeighbour
+      nearestNeighbour,
+      nnViewChange
     }
   );
 }
@@ -155,7 +156,7 @@ const changeChartViewType = (svg, selectedNodeNamesCopy,event) => {
     }
   }
   setTimeout(() => {
-    renderGraph(config.graphDataType !== "parameter", false);
+    renderGraph(config.graphDataType !== "parameter", false, config.nearestNeighbourOrigin !== "");
   }, 0); // or 16 for ~1 frame delay at 60fps
 }
 
