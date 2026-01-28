@@ -238,10 +238,10 @@ export default async function ForceGraph(
     .range(config.graphDataType === "parameter" ? NODE_RADIUS_RANGE : NODE_RADIUS_RANGE_MACRO_MESO)
     .clamp(true);
 
-  if(!config.showParameters && config.graphDataType === "parameter"){
+  if(config.graphDataType === "parameter"){
     showEle.nodes = showEle.nodes.reduce((acc, entry) => {
       const newEntry = Object.assign({}, entry);
-      if(!newEntry.isParameter){
+      if(config.showParameters || !newEntry.isParameter){
         acc.push(newEntry);
       }
       return acc;
@@ -307,7 +307,7 @@ export default async function ForceGraph(
 
   const parameterStrengthScale = d3.scaleLinear()
     .domain([0,radiusMax])
-    .range([0.01,0.4])
+    .range([0.4,0.9])
   const getXYStrength = (d) => {
     if(config.graphDataType === "parameter") return parameterStrengthScale(d.linkCount);
     if(d.type === "tier1") return 0.3;
@@ -638,6 +638,7 @@ export default async function ForceGraph(
     return {nnWidth, nnHeight};
   }
   function positionNearestNeighbours(nodeClick, initialDraw = false) {
+
     // duplicating here for call from tree.
     const svg = d3.select(".chartGroup");
     const baseSvg = d3.select(".baseSvg");
@@ -768,7 +769,6 @@ export default async function ForceGraph(
     // set the links and nodes
     config.setNotDefaultSelectedLinks(nnLinks);
     config.setNotDefaultSelectedNodeNames(allNNNodes);
-
     if(config.currentLayout === "default"){
       // if from default view, set's selectedNodeNames
       config.setSelectedNodeNames(allNNNodes.map((m) => m.name));
@@ -782,11 +782,8 @@ export default async function ForceGraph(
       resetNodeHighlight()
       svg.selectAll(".nodeBackgroundCircle")
         .classed("pulseNN", (d) =>  config.nearestNeighbourOrigin === d.id)
-
       const nnChartLinks = showEle.links.filter((f) => config.notDefaultSelectedLinks
         .some((s) => s.source === getSourceId(f) && s.target === getTargetId(f)))
-
-
       drawChartLinks(svg, nnChartLinks);
       zoomToFit(baseSvg,showEle.nodes.filter((f) => config.selectedNodeNames.includes(f.NAME)),300)
       const currentNode = showEle.nodes.find((f) => f.id === config.nearestNeighbourOrigin)
@@ -1034,13 +1031,16 @@ export default async function ForceGraph(
     || (config.graphDataType === "parameter" && config.nearestNeighbourOrigin !== "")){
       chartLinks = showEle.links.filter((f) => config.notDefaultSelectedLinks
         .some((s) => s.source === getSourceId(f) && s.target === getTargetId(f)));
+      simulation.nodes(chartNodes).force("link").links(chartLinks);
+      simulation.alphaTarget(1).restart();
     } else if (chartNodes.length !== showEle.nodes.length){
        chartLinks = showEle.links.filter((f) =>
          chartNodes.some((s) => s.NAME === getSourceId(f)) &&
          chartNodes.some((s) => s.NAME === getTargetId(f)));
     } else if (chartLinks.length > 2500){
       chartLinks = selectSpatiallyEvenLinks(showEle.links,chartNodes,2000);
-      if(config.allNodeNames.length === config.selectedNodeNames.length){
+      if(config.graphDataType === "parameter" && config.currentLayout === "default" && config.allNodeNames.length === config.selectedNodeNames.length){
+        console.log('setting links');
         config.setVisibleVariableLinks(chartLinks);
       }
     }
@@ -1829,7 +1829,10 @@ export default async function ForceGraph(
       history.replaceState(null, '', windowBaseUrl);
     }
     if(config.currentLayout === "default"){
-      if(config.shortestPathStart === "" || config.shortestPathEnd === ""){
+      let fromValidNN = false;
+      if(config.nearestNeighbourOrigin !== ""){
+        fromValidNN = true;
+      } else if(config.shortestPathStart === "" || config.shortestPathEnd === ""){
         config.setSelectedNodeNames([]);
       }
       config.setShortestPathStart("");
@@ -1842,7 +1845,7 @@ export default async function ForceGraph(
       }
       resetDefaultNodes();
       resetMenuVisibility();
-      updatePositions(true);
+      updatePositions(true,fromValidNN);
     } else {
       if(config.currentLayout === "nearestNeighbour"){
         updateViewButton(true);
