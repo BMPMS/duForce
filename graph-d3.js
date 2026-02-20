@@ -57,8 +57,22 @@ const drawChartLinks = (svg, chartLinks) => {
       const enter = group.append("g").attr("class", "linksGroup");
       enter.append("path").attr("class", "allLinkPaths linkPathForArrows");
       enter.append("path").attr("class", "allLinkPaths linkPath");
+      enter.append("path").attr("class","linkCountPath")
       return enter;
     });
+
+  const maxLinkCount = config.graphDataType === 'parameter' ? 0 : d3.max(chartLinks, (d) => d.count || 0)
+  const countStrokeScale = d3.scaleLinear()
+    .domain([1,maxLinkCount])
+    .range([0.5,15]);
+
+
+  linksGroup.select(".linkCountPath")
+    .attr("display", (d) => d.count ? 'block' : 'none')
+    .attr("stroke","white")
+    .attr("stroke-opacity", 0.4)
+    .attr("stroke-width",(d) => d.count ? countStrokeScale(d.count) : 0)
+    .attr("d", (d) => `M${d.source.x},${d.source.y},L${d.target.x},${d.target.y}`)
 
   // standard link which to create custom path in getLinkPath
   linksGroup
@@ -1211,6 +1225,8 @@ export default async function ForceGraph(
           const target = d.source.id === node.id ?   d.target : {x: event.x, y: event.y};
           const linkObject = d3.select(objects[i]);
           linkObject.select(".linkPathForArrows")
+            .attr("d",  `M${source.x},${source.y},L${target.x},${target.y}`);
+          linkObject.select(".linkCountPath")
             .attr("d",  `M${source.x},${source.y},L${target.x},${target.y}`);
           linkObject.select(".linkPath")
             .attr("d", getLinkPath)

@@ -58,7 +58,6 @@ const generateParameterData = (dataNodes, dataLinks) => {
     return acc;
   }, [])
 
-  console.log(forOb)
 
   return {nodes, links};
 
@@ -221,11 +220,11 @@ const setHierarchyData = (nodesCopy, resultEdges,parameterOnlyHierarchy) => {
   }
   // remember we've switched externalLinks so all source ids are the current submodule/segment
   const getMMLinks = (linkVar, externalLinks, currentId) => externalLinks.reduce((acc, link) => {
-
     const matchingTarget = config.parameterData.nodes.find((s) => s.id === link.target);
     const target = matchingTarget[linkVar];
-    const matchingLink = acc.find((s) => s.source === link.source && s.target === target)
+    const matchingLink = acc.find((s) => s.source === currentId && s.target === target)
     if(matchingLink) {
+      matchingLink.count += 1;
       if(matchingLink.direction !== link.direction){
         matchingLink.direction = "both";
       }
@@ -234,7 +233,8 @@ const setHierarchyData = (nodesCopy, resultEdges,parameterOnlyHierarchy) => {
         acc.push({
           source: currentId,
           target: target,
-          direction: link.direction
+          direction: link.direction,
+          count: 1
         })
       }
     }
@@ -533,7 +533,7 @@ async function getData() {
 if(!config.initialLoadComplete){
    getConvertedData();
 
-   //  getData();
+     // getData();
 
   // Instructions to upload new data
 
