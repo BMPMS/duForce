@@ -276,7 +276,7 @@ export default async function ForceGraph(
     node.color = matchingSubmodule.fill;
    // node.radiusVar = config.graphDataType === "parameter" ? node.linkCount : node.data.parameterCount;
     node.radiusVar = config.graphDataType === "parameter" ? node.linkCount : node.data.linkCount;
-    node.radius = (node.isParameter || node.data?.isParameter) ? (config.graphDataType === "parameter" ?  1 : 3) :  nodeRadiusScale(node.radiusVar);
+    node.radius = (node.isParameter || node.data?.isParameter) ? (config.graphDataType === "parameter" ?  NODE_RADIUS_RANGE[0] : 3) :  nodeRadiusScale(node.radiusVar);
     node.group = node.subModule || node.data.subModule;
     acc.push(node);
     return acc;
@@ -338,7 +338,8 @@ export default async function ForceGraph(
     .forceSimulation()
     .force("charge", d3.forceManyBody().strength((d) => config.graphDataType !== "parameter"  ? 0 : -300))
     .force("link", d3.forceLink().id((d) => d.id).strength((link) => {
-      if(config.graphDataType !== "parameter"){
+      const isParameter = link.source.data?.isParameter || link.target.data?.isParameter;
+      if(config.graphDataType !== "parameter" || isParameter){
         return 0
       } // default from https://d3js.org/d3-force/link as distance doesn't matter here
      // return 0
@@ -349,7 +350,7 @@ export default async function ForceGraph(
     .force("collide", d3.forceCollide() // change segment when ready
       .radius((d) => config.graphDataType !== "parameter" ? d.radius * 4 : d.radius * RADIUS_COLLIDE_MULTIPLIER)
       .strength(1)
-      .iterations(config.graphDataType === "parameter" ? 30 : 3)
+      .iterations(config.graphDataType === "parameter" ? 40 : 3)
     ) // change segment when ready
     //.force("cluster", forceCluster()) // cluster all nodes belonging to the same submodule.
     // change segment when ready
