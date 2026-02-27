@@ -25,6 +25,7 @@ export const NODE_RADIUS_RANGE = [5,50];
 // in these views the sizing is based on the # of parameters in the group (so all parameters are the same size)
 export const NODE_RADIUS_RANGE_MACRO_MESO = [4,30];
 
+export const MACRO_MESO_RADII = [40,15,3]
 // FORCE PARAMETERS
 export const RADIUS_COLLIDE_MULTIPLIER = 1.3;
 // the amount of space around the node - 2.5 * radius seems to work quite well

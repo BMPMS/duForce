@@ -7,10 +7,9 @@ import {
   LINK_ARROW_COLOR,
   LINK_COLOR,
   MESSAGES,
-  RADIUS_COLLIDE_MAX,
   TOOLTIP_KEYS,
   NODE_RADIUS_RANGE_MACRO_MESO,
-  SHOW_SETTINGS,
+  SHOW_SETTINGS, MACRO_MESO_RADII,
 } from "./constants";
 import { dijkstra } from "graphology-shortest-path";
 
@@ -239,11 +238,18 @@ export default async function ForceGraph(
     d3.max(nodes, (d) => d.linkCount) :
     d3.max(showEle.nodes, (d) => d.data.linkCount)
 
-  const nodeRadiusScale = d3
+  const nodeRadiusScale = config.graphDataType === "parameter" ?  d3
+      .scaleSqrt()
+      .domain([0, radiusMax])
+      .range(NODE_RADIUS_RANGE)
+      .clamp(true) : d3.scaleOrdinal().domain(["tier1","tier2","tier3"]).range(MACRO_MESO_RADII)
+
+    d3
     .scaleSqrt()
     .domain([0, radiusMax])
     .range(config.graphDataType === "parameter" ? NODE_RADIUS_RANGE : NODE_RADIUS_RANGE_MACRO_MESO)
     .clamp(true);
+
 
   if(config.graphDataType === "parameter"){
     showEle.nodes = showEle.nodes.reduce((acc, entry) => {
@@ -275,8 +281,8 @@ export default async function ForceGraph(
     }
     node.color = matchingSubmodule.fill;
    // node.radiusVar = config.graphDataType === "parameter" ? node.linkCount : node.data.parameterCount;
-    node.radiusVar = config.graphDataType === "parameter" ? node.linkCount : node.data.linkCount;
-    node.radius = (node.isParameter || node.data?.isParameter) ? (config.graphDataType === "parameter" ?  NODE_RADIUS_RANGE[0] : 3) :  nodeRadiusScale(node.radiusVar);
+    node.radiusVar = config.graphDataType === "parameter" ? node.linkCount : node.type || node.data?.type;
+    node.radius = (node.isParameter || node.data?.isParameter && config.graphDataType === "parameter") ?  NODE_RADIUS_RANGE[0] : nodeRadiusScale(node.radiusVar);
     node.group = node.subModule || node.data.subModule;
     acc.push(node);
     return acc;
@@ -336,7 +342,7 @@ export default async function ForceGraph(
   // Initialize simulation
   const simulation = d3
     .forceSimulation()
-    .force("charge", d3.forceManyBody().strength((d) => config.graphDataType !== "parameter"  ? 0 : -300))
+    .force("charge", d3.forceManyBody().strength(config.graphDataType !== "parameter"  ? 0 : -300))
     .force("link", d3.forceLink().id((d) => d.id).strength((link) => {
       const isParameter = link.source.data?.isParameter || link.target.data?.isParameter;
       if(config.graphDataType !== "parameter" || isParameter){
@@ -348,12 +354,14 @@ export default async function ForceGraph(
     .force("x", d3.forceX((d) => config.graphDataType === "parameter" ? submodulePositions[d.subModule].x :width/2).strength( config.graphDataType !== "parameter"  ? xWeight * 0.04 : 0.1))
     .force("y", d3.forceY((d) => config.graphDataType === "parameter" ? submodulePositions[d.subModule].y :width/2).strength( config.graphDataType !== "parameter"  ? yWeight * 0.04 :0.1))
     .force("collide", d3.forceCollide() // change segment when ready
-      .radius((d) => config.graphDataType !== "parameter" ? d.radius * 4 : d.radius * RADIUS_COLLIDE_MULTIPLIER)
-      .strength(1)
-      .iterations(config.graphDataType === "parameter" ? 40 : 3)
-    ) // change segment when ready
-    //.force("cluster", forceCluster()) // cluster all nodes belonging to the same submodule.
-    // change segment when ready
+      .radius((d) => d.radius * (config.graphDataType == "parameter" ? RADIUS_COLLIDE_MULTIPLIER : ((d.type === "tier3") ? 2 : 4)))
+      .strength(config.graphDataType === "parameter" ? 1 : 0.7)
+      .iterations(config.graphDataType === "parameter" ? 40 : 8)
+    )
+
+    if(config.graphDataType !== "parameter"){
+      simulation.force("cluster", forceCluster()) // cluster all nodes belonging to the same submodule.
+    }
 
   simulation.stop();
 
@@ -1287,7 +1295,7 @@ export default async function ForceGraph(
           id: descendant.data.id,
           name: descendant.data.NAME,
           DISPLAY_NAME: descendant.data.DISPLAY_NAME,
-          radius: descendant.data.isParameter ? 3 : nodeRadiusScale(descendant.data.linkCount),
+          radius: nodeRadiusScale(descendant.data.type),
           color: matchingSubModule.fill,
           children: filteredChildren
             ? filteredChildren.map((m) => m.data.id)
@@ -1568,8 +1576,8 @@ export default async function ForceGraph(
 
 
   function forceCluster() {
-    const strength = config.graphDataType !== "parameter" ? 0 : PARAMETER_CLUSTER_STRENGTH;
-    const parentStrength = 0.02;
+    const strength =  0.25 ;
+    const parentStrength = 0.025;
     let nodes;
     function force(alpha) {
 
@@ -2116,51 +2124,6 @@ export default async function ForceGraph(
       });
     }
 
-
-    // update submodule Positions fill
-    // update color.
-    const constantsPanel = document.getElementById('constantOptionsPanel');
-    const constantsButtonPanel = document.getElementById('constantOptionsButtonContainer');
-    const constantsOverlay = document.getElementById('constantOptionsModalOverlay');
-    const constantsButton = document.getElementById('constantOptionsCloseButton');
-
-    function closeConstantsModal() {
-      constantsPanel.classList.remove('active');
-      constantsOverlay.classList.remove('active');
-      constantsButtonPanel.classList.remove('active');
-      if(config.graphDataType === "parameter"){
-        d3.select(".animation-container").style("display", "flex");
-        setTimeout(() => {
-          simulation
-            .force("link", d3.forceLink().id((d) => d.id).strength((link) => {
-              if(config.graphDataType !== "parameter"){
-                return 0
-              } // default from https://d3js.org/d3-force/link as distance doesn't matter here
-              // return 0
-              return config.linkForceStrength/ Math.min(link.source.radiusVar, link.target.radiusVar)
-            }))
-            .force("cluster", forceCluster()) // cluster all nodes belonging to the same submodule.
-            .force("collide", d3.forceCollide() // change segment when ready.force("cluster", forceCluster()) // cluster all nodes belonging to the same submodule.
-            .radius((d) => Math.min(d.radius * config.radiusCollideMultiplier, RADIUS_COLLIDE_MAX))
-            .strength(0.8));
-
-          simulation.nodes([]).force("link").links([]);
-          simulation.nodes(showEle.nodes).force("link").links(showEle.links);
-          // restart simulation
-          simulation.alphaTarget(0.1).restart();
-          // stop at calculated tick time (from previous dev)
-          simulation.tick(config.simulationTickTime);
-          // stop simulation
-          simulation.stop();
-          updatePositions();
-        }, 0); // or 16 for ~1 frame delay at 60fps
-      }
-    }
-
-
-    // Close modal on overlay click
-    constantsOverlay.addEventListener('click', closeConstantsModal);
-    constantsButton.addEventListener('click', closeConstantsModal);
 
     const downloadImageButton = d3.select("#downloadImage");
 
