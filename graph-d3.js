@@ -620,8 +620,8 @@ export default async function ForceGraph(
   function renderNNLevelLabels (svg,nnData) {
 
     // render (or unrenders) the level titles
-    const nnWidth = 200;
-    const nnHeight = 1000;
+    const nnWidth = 1500;
+    const nnHeight = 3000;
 
     svg.selectAll(".nnLabelGroup")
       .attr("display","block");
@@ -636,7 +636,7 @@ export default async function ForceGraph(
         return enter;
       });
 
-    nnLabelGroup.attr("transform",(d,i) => `translate(${i * nnWidth},${-remToPx(4)})`)
+    nnLabelGroup.attr("transform",(d,i) => `translate(${i * nnWidth},${-remToPx(8)})`)
 
     nnLabelGroup.select(".nnLabelType")
       .attr("x", nnWidth/2)
@@ -777,8 +777,8 @@ export default async function ForceGraph(
       // so they don't collide
       const ySimulation = d3.forceSimulation()
         .alphaDecay(0.1)
-        .force('x', d3.forceX((d) => d.x).strength(0.8))
-        .force('y', d3.forceY((d) => d.y).strength(0.8))
+        .force('x', d3.forceX((d) => d.x).strength(0.3))
+        .force('y', d3.forceY((d) => d.y).strength(0.6))
         .force('collide', d3.forceCollide().radius((d) => d.radius * (radiusMultiple/2)).strength(0.6));
       ySimulation.stop();
       ySimulation.nodes(allNNNodes);
