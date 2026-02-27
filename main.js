@@ -53,7 +53,7 @@ const generateParameterData = (dataNodes, dataLinks) => {
     const sourceLinks = links.filter((f) => f.source === node.id).length;
     const targetLinks = links.filter((f) => f.target === node.id).length;
     forOb.push({id: node.id, sourceLinks, targetLinks, isParameter: node.isParameter})
-    node.linkCount =  Math.log(1 + (sourceLinks + targetLinks))
+    node.linkCount = Math.sqrt(2 * (sourceLinks + targetLinks))
     acc.push(node);
     return acc;
   }, [])
@@ -303,6 +303,7 @@ const setHierarchyData = (nodesCopy, resultEdges,parameterOnlyHierarchy) => {
       children: node.children?.map(hierarchyToJSON)
     };
   }
+
   console.log({
     'hierarchyData': hierarchyToJSON(subModuleNodes[0].parent),
     'parameterData': config.parameterData,
@@ -533,7 +534,7 @@ async function getData() {
 if(!config.initialLoadComplete){
    getConvertedData();
 
-     // getData();
+    //  getData();
 
   // Instructions to upload new data
 

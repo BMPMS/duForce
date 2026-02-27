@@ -57,7 +57,6 @@ const drawChartLinks = (svg, chartLinks) => {
       const enter = group.append("g").attr("class", "linksGroup");
       enter.append("path").attr("class", "allLinkPaths linkPathForArrows");
       enter.append("path").attr("class", "allLinkPaths linkPath");
-      enter.append("path").attr("class","linkCountPath")
       return enter;
     });
 
@@ -67,12 +66,6 @@ const drawChartLinks = (svg, chartLinks) => {
     .range([0.5,15]);
 
 
-  linksGroup.select(".linkCountPath")
-    .attr("display", (d) => d.count ? 'block' : 'none')
-    .attr("stroke","white")
-    .attr("stroke-opacity", 0.4)
-    .attr("stroke-width",(d) => d.count ? countStrokeScale(d.count) : 0)
-    .attr("d", (d) => `M${d.source.x},${d.source.y},L${d.target.x},${d.target.y}`)
 
   // standard link which to create custom path in getLinkPath
   linksGroup
@@ -319,34 +312,46 @@ export default async function ForceGraph(
   const xWeight = width > height ? 0.7 : 1;
   const yWeight = width > height ? 1 : 0.7;
 
-  const parameterStrengthScale = d3.scaleLinear()
-    .domain([0,radiusMax])
-    .range([0.4,0.9])
-  const getXYStrength = (d) => {
-    if(config.graphDataType === "parameter") return parameterStrengthScale(d.linkCount);
-    if(d.type === "tier1") return 0.3;
-    if(d.type === "tier2") return 0.6;
-    if(d.type === "tier3") return 0.05;
+
+  const getSubModulePositions = () => {
+
+    const submoduleLeaves = config.hierarchyData.subModuleNodes.map((m) => ({name: m.id,value: m.leaves().length}));
+    const leafHierarchy = d3.hierarchy({name: 'root', children: submoduleLeaves})
+      .sum((s) => s.value);
+    const tree = d3.treemap()
+      .size([width,height]);
+    tree(leafHierarchy);
+    const fixedOrder = ['submodule-1','submodule-10','submodule-3','submodule-2','submodule-5','submodule-4','submodule-7','submodule-11','submodule-8','submodule-9','submodule-6']
+    const submoduleRects = leafHierarchy.descendants()
+      .filter((f) => f.depth > 0)
+      .map((m) => ({width: m.x1 - m.x0, height: m.y1-m.y0, id: m.data.name}))
+      .sort((a,b) => d3.ascending(fixedOrder.findIndex((f) => f === a.id), fixedOrder.findIndex((f) => f === b.id)));
+    return placeRectsOnOval(submoduleRects,width/height);
   }
+
+
+
+  const submodulePositions = getSubModulePositions();
+
   // Initialize simulation
   const simulation = d3
     .forceSimulation()
     .force("charge", d3.forceManyBody().strength((d) => config.graphDataType !== "parameter"  ? 0 : -300))
-.force("link", d3.forceLink().id((d) => d.id).strength((link) => {
+    .force("link", d3.forceLink().id((d) => d.id).strength((link) => {
       if(config.graphDataType !== "parameter"){
         return 0
       } // default from https://d3js.org/d3-force/link as distance doesn't matter here
      // return 0
-      return LINK_FORCE_STRENGTH/ Math.min(link.source.radius, link.target.radius)
+      return LINK_FORCE_STRENGTH
     }))
-    .force("x", d3.forceX(width/2).strength((d) => config.graphDataType !== "parameter"  ? xWeight * 0.04 : getXYStrength(d) * xWeight))
-    .force("y", d3.forceY(height/2).strength((d) => config.graphDataType !== "parameter"  ? yWeight * 0.04 :getXYStrength(d) * yWeight))
+    .force("x", d3.forceX((d) => config.graphDataType === "parameter" ? submodulePositions[d.subModule].x :width/2).strength( config.graphDataType !== "parameter"  ? xWeight * 0.04 : 0.1))
+    .force("y", d3.forceY((d) => config.graphDataType === "parameter" ? submodulePositions[d.subModule].y :width/2).strength( config.graphDataType !== "parameter"  ? yWeight * 0.04 :0.1))
     .force("collide", d3.forceCollide() // change segment when ready
-      .radius((d) => config.graphDataType !== "parameter" ? d.radius * 4 : Math.min(d.radius * RADIUS_COLLIDE_MULTIPLIER, RADIUS_COLLIDE_MAX))
-      .strength(0.8)
-      .iterations(config.graphDataType === "parameter" ? 5 : 3)
+      .radius((d) => config.graphDataType !== "parameter" ? d.radius * 4 : d.radius * RADIUS_COLLIDE_MULTIPLIER)
+      .strength(1)
+      .iterations(config.graphDataType === "parameter" ? 30 : 3)
     ) // change segment when ready
-    .force("cluster", forceCluster()) // cluster all nodes belonging to the same submodule.
+    //.force("cluster", forceCluster()) // cluster all nodes belonging to the same submodule.
     // change segment when ready
 
   simulation.stop();
@@ -1226,8 +1231,6 @@ export default async function ForceGraph(
           const linkObject = d3.select(objects[i]);
           linkObject.select(".linkPathForArrows")
             .attr("d",  `M${source.x},${source.y},L${target.x},${target.y}`);
-          linkObject.select(".linkCountPath")
-            .attr("d",  `M${source.x},${source.y},L${target.x},${target.y}`);
           linkObject.select(".linkPath")
             .attr("d", getLinkPath)
         })
@@ -1564,7 +1567,7 @@ export default async function ForceGraph(
 
 
   function forceCluster() {
-    const strength = config.graphDataType !== "parameter" ? 0.35 : PARAMETER_CLUSTER_STRENGTH;
+    const strength = config.graphDataType !== "parameter" ? 0 : PARAMETER_CLUSTER_STRENGTH;
     const parentStrength = 0.02;
     let nodes;
     function force(alpha) {
@@ -2361,4 +2364,73 @@ function getSourceId(d) {
 }
 function getTargetId(d) {
   return d.target && (d.target.id ? d.target.id : d.target);
+}
+
+// used for finding submodule 'centres' in parameter view
+function placeRectsOnOval (rects, aspectRatio = 1.5, gap = 8) {
+  const totalArc = rects.reduce((s, d) => s + d.width + gap, 0);
+  const maxDim = Math.max(...rects.map((d) => Math.max(d.width, d.height)));
+  const minRadius = maxDim * 0.85;
+
+  // Grow rx/ry at the given aspect ratio until circumference and centre hole are satisfied
+  let ry = Math.max(
+    minRadius,
+    (totalArc / (2 * Math.PI) / Math.sqrt(aspectRatio)) * 0.9
+  );
+  let rx = ry * aspectRatio;
+
+  for (let i = 0; i < 80; i++) {
+    const h = Math.pow(rx - ry, 2) / Math.pow(rx + ry, 2);
+    const C = Math.PI * (rx + ry) * (1 + (3 * h) / (10 + Math.sqrt(4 - 3 * h)));
+    const centreOk = rx - maxDim / 2 > minRadius && ry - maxDim / 2 > minRadius;
+    if (C >= totalArc && centreOk) break;
+    ry *= 1.04;
+    rx = ry * aspectRatio;
+  }
+
+  // Build arc-length lookup table (start at top of oval)
+  const N = 4000;
+  const table = [];
+  let arc = 0,
+    px,
+    py;
+  for (let i = 0; i <= N; i++) {
+    const t = -Math.PI / 2 + (i / N) * Math.PI * 2;
+    const x = rx * Math.cos(t);
+    const y = ry * Math.sin(t);
+    if (i > 0) arc += Math.hypot(x - px, y - py);
+    table.push({ arcLen: arc, x, y });
+    px = x;
+    py = y;
+  }
+
+  const C = table[table.length - 1].arcLen;
+  const totalWidth = rects.reduce((s, d) => s + d.width, 0);
+  const scale = (C - gap * rects.length) / totalWidth;
+
+  // Sample a point at a given arc length
+  function sampleAtArc(target) {
+    const arc = ((target % C) + C) % C;
+    let lo = 0,
+      hi = table.length - 1;
+    while (lo < hi - 1) {
+      const mid = (lo + hi) >> 1;
+      table[mid].arcLen < arc ? (lo = mid) : (hi = mid);
+    }
+    const a = table[lo],
+      b = table[hi];
+    const f =
+      b.arcLen === a.arcLen ? 0 : (arc - a.arcLen) / (b.arcLen - a.arcLen);
+    return { x: a.x + f * (b.x - a.x), y: a.y + f * (b.y - a.y) };
+  }
+
+  // Place each rect — returned x,y are centre coordinates relative to oval centre (0,0)
+  // Add your own cx/cy offset when rendering
+  let cursor = 0;
+  return rects.reduce((acc, d) => {
+    const pt = sampleAtArc(cursor + (d.width * scale) / 2);
+    cursor += d.width * scale + gap;
+    acc[d.id] = { x: pt.x, y: pt.y };
+    return acc;
+  },{});
 }
