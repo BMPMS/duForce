@@ -20,6 +20,9 @@ export const config = {
   showSingleNodes: false,
   // graph data set on initial load
   allNodeNames: [],
+  noParameterAllNodeNames:[],
+  totalNodeCount: 0,
+  noParameterNodeCount: 0,
   expandedMacroMesoNodes: [],
   hierarchyData: {subModuleNames: [], subModuleNodes: [], segmentNames: [],segmentNodes:[], mmLinks: [], segmentSubmoduleMapper:{}},
   parameterData: {},
@@ -29,7 +32,7 @@ export const config = {
   currentTreeData: {}, // current tree expansion status
   tier1And2Mapper: {},// used when collapsing/expanding tree
   // set after initial default load
-  defaultNodePositions:[],
+  defaultNodePositions:{},
   // arrays used for selected nodes (notDefault for NN + SP layouts)
   selectedNodeNames: [],
   notDefaultSelectedNodeNames: [],
@@ -39,14 +42,7 @@ export const config = {
   nnUrlView: false,
   visibleVariableLinks:[],
   // config constants testing variables
-  radiusMin: NODE_RADIUS_RANGE[0],
-  radiusMax: NODE_RADIUS_RANGE[1],
-  radiusCollideMultiplier: RADIUS_COLLIDE_MULTIPLIER,
-  linkForceStrength: LINK_FORCE_STRENGTH,
-  parameterClusterStrength: PARAMETER_CLUSTER_STRENGTH,
-  simulationTickTime: SIMULATION_TICK_TIME,
-  labelRem: LABEL_FONT_BASE_REM,
-  showParameters: true,
+  showParameters: false,
   clickedMMVariable: "",
   setVisibleVariableLinks(newArray) {
     if (typeof newArray === "object") {
@@ -67,55 +63,6 @@ export const config = {
       this.showParameters = newBoolean;
     } else {
       console.error("Expected a boolean for showParameters.");
-    }
-  },
-  setLabelRem(newNumber) {
-    if (typeof newNumber === "number") {
-      this.labelRem = newNumber;
-    } else {
-      console.error("Expected an string for labelRem.");
-    }
-  },
-  setParameterClusterStrength(newNumber) {
-    if (typeof newNumber === "number") {
-      this.parameterClusterStrength = newNumber;
-    } else {
-      console.error("Expected an string for parameterClusterStrength.");
-    }
-  },
-  setRadiusMin(newNumber) {
-    if (typeof newNumber === "number") {
-      this.radiusMin = newNumber;
-    } else {
-      console.error("Expected an string for radiusMin.");
-    }
-  },
-  setRadiusMax(newNumber) {
-    if (typeof newNumber === "number") {
-      this.radiusMax = newNumber;
-    } else {
-      console.error("Expected an string for radiusMax.");
-    }
-  },
-  setRadiusCollideMultiplier(newNumber) {
-    if (typeof newNumber === "number") {
-      this.radiusCollideMultiplier = newNumber;
-    } else {
-      console.error("Expected an string for radiusCollideMultiplier.");
-    }
-  },
-  setLinkForceStrength(newNumber) {
-    if (typeof newNumber === "number") {
-      this.linkForceStrength = newNumber;
-    } else {
-      console.error("Expected an string for linkForceStrength.");
-    }
-  },
-  setSimulationTickTime(newNumber) {
-    if (typeof newNumber === "number") {
-      this.simulationTickTime = newNumber;
-    } else {
-      console.error("Expected an string for simulationTickTime.");
     }
   },
   setShortestPathString(newString) {
@@ -184,6 +131,27 @@ export const config = {
       console.error("Expected an array for allNodeNames.");
     }
   },
+  setNoParameterAllNodeNames(newObject) {
+    if (typeof newObject === "object") {
+      this.noParameterAllNodeNames = newObject;
+    } else {
+      console.error("Expected an array for allNodeNames.");
+    }
+  },
+  setTotalNodeCount(newNumber) {
+    if (typeof +newNumber === "number") {
+      this.totalNodeCount = +newNumber;
+    } else {
+      console.error("Expected an array for totalNodeCount.");
+    }
+  },
+  setNoParameterNodeCount(newNumber) {
+    if (typeof +newNumber === "number") {
+      this.noParameterNodeCount = +newNumber;
+    } else {
+      console.error("Expected an array for noParameterNodeCount.");
+    }
+  },
   setNearestNeighbourDegree(newNumber) {
     if (typeof +newNumber === "number") {
       this.nearestNeighbourDegree = +newNumber;
@@ -195,7 +163,7 @@ export const config = {
     if (typeof newObject === "object") {
       this.defaultNodePositions = newObject;
     } else {
-      console.error("Expected an array for defaultNodePositions.");
+      console.error("Expected an object for defaultNodePositions.");
     }
   },
   setNotDefaultSelectedLinks(newObject) {

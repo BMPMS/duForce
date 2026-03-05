@@ -9,8 +9,8 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/js/all.min.js" crossorigin="anonymous"></script>
     
     <title>Graph Application</title>
-    <script type="module" crossorigin src="/duForce/assets/index-d74deed4.js"></script>
-    <link rel="stylesheet" href="/duForce/assets/index-bb728689.css">
+    <script type="module" crossorigin src="/duForce/assets/index-43fcfc94.js"></script>
+    <link rel="stylesheet" href="/duForce/assets/index-e4e383e1.css">
   </head>
   <body>
     <!-- tooltipCount + info message (top left + middle if needed) -->
@@ -73,12 +73,6 @@
     <div id="helpInfoButtonContainer" class="infoButtonContainer">
       <button id="helpInfoCloseButton" class="infoCloseButton">x</button>
     </div>
-    <!-- constantOptions panel, fixed bottom right above zoom buttons, only available on request -->
-    <div id="constantOptionsModalOverlay"></div>
-    <div id="constantOptionsPanel"></div>
-    <div id="constantOptionsButtonContainer" class="infoButtonContainer">
-      <button id="constantOptionsCloseButton" class="CloseButton">x</button>
-    </div>
     <div class="tooltip"></div>
     <div class="tooltipExtra"></div>
     <!-- main app container -->
@@ -91,7 +85,7 @@
           <label><input type="radio" class="chartDataRadio" name="chartDataRadio" value="segment">Meso</label>
          <label><input type="radio" class="chartDataRadio" name="chartDataRadio" value="parameter">Variable</label>
        </div>
-      <div id = "parameterRadio"> <input type="checkbox" id="viewParams" class="toggle-checkbox" checked>
+      <div id = "parameterRadio"> <input type="checkbox" id="viewParams" class="toggle-checkbox">
         <label for="viewParams">show Parameters</label></div>
        <!-- parameter menu with - search input, nnDegreeDiv + buttons -->
       <div id="parameter-menu">
@@ -124,8 +118,6 @@
           <!-- help, download, reset + show/view menu buttons -->
         <p class="otherButton" id="helpInfo"><i class="fa-solid fa-circle-info"></i></p>
         <p class="otherButton" id="downloadImage"><i class="fa-solid fa-circle-down"></i></p>
-      <p class="otherButton" id="constantOptions"><i class="fa-solid fa-gear"></i></p>
-
         <p  id="resetButton">Reset</p>
 
         <div id="collapsibleMenuToggle">
@@ -133,7 +125,6 @@
           <p class="viewButton" id="hideInfo">Hide interactive menu</p>
         </div>
 
-      
       
       <!-- container far right -->
       <div id="collapsibleMenuContainer">

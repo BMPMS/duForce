@@ -520,9 +520,7 @@ input[type="range"] {
     left: 1.45rem;
 }
 
-#constantOptions{
-    left: 2.65rem;
-}
+
 #downloadNNData {
     cursor: pointer;
     position: absolute;
@@ -533,7 +531,7 @@ input[type="range"] {
 }
 
 
-#helpInfo, #downloadImage, #constantOptions{
+#helpInfo, #downloadImage{
     position: absolute;
     top: 1.6rem;
     padding:  0.6rem 0px 0px 0.3rem;
@@ -661,7 +659,7 @@ input[type="range"] {
 
 }
 
-#helpInformationPanel, #constantOptionsPanel {
+#helpInformationPanel {
     background-color: black;
     color: white;
     z-index: 3000;
@@ -679,13 +677,13 @@ input[type="range"] {
     overflow-y: auto;
 }
 
-#helpInformationPanel.active, #constantOptionsPanel.active {
+#helpInformationPanel.active {
     visibility: visible;
     opacity: 1;
 }
 
 /* Optional: backdrop overlay */
-#helpModalOverlay, #constantOptionsModalOverlay {
+#helpModalOverlay {
     position: fixed;
     top: 0;
     left: 0;
@@ -698,7 +696,7 @@ input[type="range"] {
     transition: opacity 0.2s ease;
 }
 
-#helpModalOverlay.active, #constantOptionsModalOverlay.active {
+#helpModalOverlay.active {
     visibility: visible;
     opacity: 1;
 }

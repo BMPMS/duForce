@@ -6,7 +6,7 @@ import ForceGraph from "./graph-d3";
 
 const mainAppContainerSelector = "#app";
 export const resetNodeHighlight = () => {
-  const expandedAll = config.selectedNodeNames.length === config.allNodeNames.length;
+  const expandedAll = config.selectedNodeNames.length === (config.showParameters ? config.totalNodeCount : config.noParameterNodeCount);
 
   const svg = d3.select(".chartGroup");
   svg.selectAll(".nodeOpacityCircle")
@@ -139,12 +139,12 @@ const changeChartViewType = (svg, selectedNodeNamesCopy,event) => {
   config.setExpandedMacroMesoNodes([]);
   config.setMacroMesoUrlExtras([]);
   const getSelectedNames = () => {
-    if(config.graphDataType === "parameter") return selectedNodeNamesCopy;
+    if(config.graphDataType === "parameter") return config.showParameters ? config.allNodeNames : config.noParameterAllNodeNames;
     if(config.graphDataType === "submodule") return config.hierarchyData.subModuleNames;
     return config.hierarchyData.segmentNames;
   }
   const selectedNames = getSelectedNames();
-  const nodeNamesCopy = JSON.parse(JSON.stringify(selectedNames));
+  let nodeNamesCopy = JSON.parse(JSON.stringify(selectedNames));
   config.setSelectedNodeNames(nodeNamesCopy);
   svg.selectAll(".selectedCheckboxIcon").style("display",config.graphDataType === "parameter" ? "block" : "none")
   svg.selectAll(".selectedCheckboxIconPath")
@@ -167,7 +167,7 @@ const toggleShowParameters = (event) => {
   config.setShowParameters(showParameters);
   config.setCurrentLayout("default");
   config.setShortestPathString("");
-  config.setSelectedNodeNames(config.allNodeNames);
+  config.setSelectedNodeNames(config.showParameters ? config.allNodeNames : config.noParameterAllNodeNames);
   config.setNotDefaultSelectedLinks([]);
   config.setNotDefaultSelectedNodeNames([]);
   config.setNearestNeighbourOrigin("");
@@ -178,7 +178,6 @@ const toggleShowParameters = (event) => {
   setTimeout(() => {
     renderGraph(config.graphDataType !== "parameter");
   }, 0); // or 16 for ~1 frame delay at 60fps
-
 }
 
 
