@@ -163,10 +163,11 @@ const setHierarchyData = (nodesCopy, resultEdges,parameterOnlyHierarchy) => {
       // adding a check in case this changes
       console.log('change in data, new direction added!!!')
     }
+
     // direction the same as out
     const sourceLinks = resultEdges.filter((f) => parameterSet.includes(f.source) && !parameterSet.includes(f.target))
       .reduce((acc, entry) => {
-        if(!acc.some((s) => s.target === entry.target)){
+        if(!acc.some((s) => s.target === entry.target && s.source === entry.source)){
           acc.push({
             source: entry.source,
             target: entry.target,
@@ -179,7 +180,7 @@ const setHierarchyData = (nodesCopy, resultEdges,parameterOnlyHierarchy) => {
     // switching source + target as in
     const targetLinks = resultEdges.filter((f) => !parameterSet.includes(f.source) && parameterSet.includes(f.target))
       .reduce((acc, entry) => {
-        if(!acc.some((s) => s.source === entry.target)){
+        if(!acc.some((s) => s.source === entry.target && s.target === entry.source)){
           // switching the direction!
           const hasOpposite = sourceLinks.find((s) => s.target === entry.target && s.source === entry.source);
           if(hasOpposite){
@@ -253,6 +254,7 @@ const setHierarchyData = (nodesCopy, resultEdges,parameterOnlyHierarchy) => {
         m.data.parameterCount = m.leaves().length;
         subModuleNames.add(m.data.id);
         const { externalLinks,linkCount } = getOppositeData(m.leaves());
+
         // subModule -> parameter and parameter -> subModule
         const subModuleLinks = getMMLinks("subModule",externalLinks, m.data.id);
         // subModule -> segment and segment -> subModule
@@ -262,6 +264,9 @@ const setHierarchyData = (nodesCopy, resultEdges,parameterOnlyHierarchy) => {
         subModuleLinks.forEach((link) => addToAllLinks(mmLinks,link));
         segmentLinks.forEach((link) => addToAllLinks(mmLinks,link));
         parameterLinks.forEach((link) => addToAllLinks(mmLinks,link));
+
+
+
         // internal links covered by parameterData links
       } else if(m.depth === 2){
         m.data.parameterCount = m.children.length;
@@ -337,7 +342,7 @@ const handleUrlInputs = () => {
           let parameters = args[1];
           if(parameters.includes("~")){
             // ~used for upper case (URL lower/upper unreliable with caching)
-            parameters = parameters.replace(/~/g,'').toUpperCase();
+            parameters = parameters.replace(/~/g,'');
           }
           // split parameters
           const {0: parameter1, 1: parameter2} = parameters.split(":");
@@ -413,12 +418,6 @@ async function getConvertedData () {
     const {parameterData, hierarchyData, mmLinks,segmentSubmoduleMapper} = convertedData;
 
     config.setParameterData(parameterData);
-    const selectedNodeNames = parameterData.nodes.map((m) => m.NAME);
-    config.setSelectedNodeNames(selectedNodeNames);
-
-    // copy selected node names and set config
-    const selectedNodeNamesCopy = JSON.parse(JSON.stringify(config.selectedNodeNames));
-    config.setAllNodeNames(selectedNodeNamesCopy);
 
     const treeData = d3.hierarchy(hierarchyData);
     // mapping submodules and segments to their child nodes (for tree selection)
@@ -451,7 +450,12 @@ async function getConvertedData () {
         segmentSubmoduleMapper
       })
 
-      // call the tree
+      config.setTotalNodeCount(parameterData.nodes.length);
+      config.setNoParameterNodeCount(parameterData.nodes.filter((f) => !f.isParameter).length);
+      config.setAllNodeNames(parameterData.nodes.map((m) => m.id))
+      config.setNoParameterAllNodeNames(parameterData.nodes.filter((f) => !f.isParameter).map((m) => m.id))
+      config.setSelectedNodeNames(config.showParameters ? parameterData.nodes.map((m) => m.id) : parameterData.nodes.filter((f) => !f.isParameter).map((m) => m.id));
+    // call the tree
       VariableTree(treeData);
   } catch (error) {
     console.error("Error fetching data:", error);
@@ -491,14 +495,14 @@ async function getData() {
       resultNodesTrunc = dataNullValueCheck(resultNodesTrunc,"SUBMODULE");
       resultNodesTrunc = dataNullValueCheck(resultNodesTrunc,"SEGMENT");
       // selected node names stored in global array (default all selected)
-      config.setSelectedNodeNames(resultNodesTrunc.map((m) => m.NAME));
+      let selectedNodeNames = resultNodesTrunc.map((m) => m.NAME);
+      if(!config.showParameters){
+        selectedNodeNames = selectedNodeNames.filter((f) => !f.isParameter);
+      }
+      config.setSelectedNodeNames(selectedNodeNames);
 
       // as previously, chart always renders with full dataset (stored here);
       config.setParameterData(generateParameterData(resultNodesTrunc,resultEdges));
-
-      // copy selected node names and set config
-      const selectedNodeNamesCopy = JSON.parse(JSON.stringify(config.selectedNodeNames));
-      config.setAllNodeNames(selectedNodeNamesCopy);
 
       // get hierarchy from node names
       const treeData = getHierarchy(resultNodesTrunc);
@@ -534,17 +538,18 @@ async function getData() {
 if(!config.initialLoadComplete){
    getConvertedData();
 
-    //  getData();
+     // getData();
 
   // Instructions to upload new data
 
   // a) copy nodes.json + edges.json into the assets folder (should only be convertedData.json in there)
   // b) comment getConvertedData() and uncomment getData()
-  // c) the new convertedData.json has been written to the console in developer tools
-  // d) copy this from the console (for me this is right click copy object)
-  // e) replace current contents of convertedData.json with new data from console
-  // f) uncomment getData() and comment getConvertedData()
-  // g) make sure the nodes load correctly
-  // h) delete nodes.json and edges.json from assets
+  // c) go to the terminal and start the app by running npm run dev (if this is the first time doing this you'll need to follow install instructions below)
+  // d) the new convertedData.json has been written to the console in developer tools
+  // e) copy this from the console (for me this is right click copy object)
+  // f) replace current contents of convertedData.json with new data from console
+  // g) uncomment getData() and comment getConvertedData()
+  // h) make sure the nodes load correctly
+  // i) delete nodes.json and edges.json from assets
 
 }

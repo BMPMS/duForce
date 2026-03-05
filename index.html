@@ -71,12 +71,6 @@
     <div id="helpInfoButtonContainer" class="infoButtonContainer">
       <button id="helpInfoCloseButton" class="infoCloseButton">x</button>
     </div>
-    <!-- constantOptions panel, fixed bottom right above zoom buttons, only available on request -->
-    <div id="constantOptionsModalOverlay"></div>
-    <div id="constantOptionsPanel"></div>
-    <div id="constantOptionsButtonContainer" class="infoButtonContainer">
-      <button id="constantOptionsCloseButton" class="CloseButton">x</button>
-    </div>
     <div class="tooltip"></div>
     <div class="tooltipExtra"></div>
     <!-- main app container -->
@@ -89,7 +83,7 @@
           <label><input type="radio" class="chartDataRadio" name="chartDataRadio" value="segment">Meso</label>
          <label><input type="radio" class="chartDataRadio" name="chartDataRadio" value="parameter">Variable</label>
        </div>
-      <div id = "parameterRadio"> <input type="checkbox" id="viewParams" class="toggle-checkbox" checked>
+      <div id = "parameterRadio"> <input type="checkbox" id="viewParams" class="toggle-checkbox">
         <label for="viewParams">show Parameters</label></div>
        <!-- parameter menu with - search input, nnDegreeDiv + buttons -->
       <div id="parameter-menu">
@@ -122,8 +116,6 @@
           <!-- help, download, reset + show/view menu buttons -->
         <p class="otherButton" id="helpInfo"><i class="fa-solid fa-circle-info"></i></p>
         <p class="otherButton" id="downloadImage"><i class="fa-solid fa-circle-down"></i></p>
-      <p class="otherButton" id="constantOptions"><i class="fa-solid fa-gear"></i></p>
-
         <p  id="resetButton">Reset</p>
 
         <div id="collapsibleMenuToggle">
@@ -149,25 +141,6 @@
             panel.innerHTML = "<p>Failed to load help content.</p>";
             console.error(err);
           });
-      </script>
-      <script type="module">
-        const constantsPanel = document.getElementById('constantOptionsPanel');
-        import constantOptionsUrl from './constantOptions.html?url';
-
-        // Load infoPanel.html content on page load
-        fetch(constantOptionsUrl)
-          .then(response => {
-            if (!response.ok) throw new Error("Failed to load panel content");
-            return response.text();
-          })
-          .then(html => {
-            constantsPanel.innerHTML = html;
-          })
-          .catch(err => {
-            constantsPanel.innerHTML = "<p>Failed to load help content.</p>";
-            console.error(err);
-          });
-
       </script>
       <!-- container far right -->
       <div id="collapsibleMenuContainer">
