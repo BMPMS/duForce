@@ -1,6 +1,7 @@
 import VariableTree from "./tree";
 import { config } from "./config";
 import * as d3 from "d3";
+import { useDefaults } from "./constants";
 
 // functions used by getData in order - dataNullValueCheck, generateParameterData, getHierarchy, setHierarchyData
 const dataNullValueCheck = (nodeData, dataType) => {
@@ -415,7 +416,7 @@ async function getConvertedData () {
     }
 
     const convertedData = await response1.json();
-    const {parameterData, hierarchyData, mmLinks,segmentSubmoduleMapper} = convertedData;
+    const {parameterData, hierarchyData, mmLinks,segmentSubmoduleMapper, defaultNodePositions} = convertedData;
 
     config.setParameterData(parameterData);
 
@@ -455,7 +456,10 @@ async function getConvertedData () {
       config.setAllNodeNames(parameterData.nodes.map((m) => m.id))
       config.setNoParameterAllNodeNames(parameterData.nodes.filter((f) => !f.isParameter).map((m) => m.id))
       config.setSelectedNodeNames(config.showParameters ? parameterData.nodes.map((m) => m.id) : parameterData.nodes.filter((f) => !f.isParameter).map((m) => m.id));
-    // call the tree
+      if(useDefaults){
+        config.setDefaultNodePositions(defaultNodePositions)
+      }
+      // call the tree
       VariableTree(treeData);
   } catch (error) {
     console.error("Error fetching data:", error);
