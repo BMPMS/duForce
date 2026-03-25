@@ -7,7 +7,6 @@ import ForceGraph from "./graph-d3";
 const mainAppContainerSelector = "#app";
 export const resetNodeHighlight = () => {
   const expandedAll = config.selectedNodeNames.length === (config.showParameters ? config.totalNodeCount : config.noParameterNodeCount);
-
   const svg = d3.select(".chartGroup");
   svg.selectAll(".nodeOpacityCircle")
     .attr("opacity", (d) => expandedAll || config.currentLayout !== "default" ? 1 :

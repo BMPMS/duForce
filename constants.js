@@ -1,4 +1,4 @@
-export const SHOW_SETTINGS = false;
+export const useDefaults = true;
 export const LINK_COLOR = "#C0C0C0";
 export const PARAMETER_CLUSTER_STRENGTH = 0.2;
 export const LINK_ARROW_COLOR = "#737373";
@@ -34,7 +34,7 @@ export const RADIUS_COLLIDE_MULTIPLIER = 1.3;
 // I've set a maximum for this as well so there is not a crazy gap around the larger nodes
 // (which have space for labels anyway)
 // it should never go lower than the NODE_RADIUS_RANGE max
-export const LINK_FORCE_STRENGTH = 0.05;
+export const LINK_FORCE_STRENGTH = 0.01;
 // the strength of the force pulling the nodes together based on their connections
 // 0 will group by submodule
 // 1 was where you had it originally

@@ -397,13 +397,16 @@ export default async function ForceGraph(
   // node visibility can depend on zoom level
   const getNodeLabelDisplay = (d) => {
     if(config.graphDataType !== "parameter") return "block";
-    if(d.NAME === config.nearestNeighbourOrigin || config.currentLayout === "shortestPath") return "block";
+    if(config.nearestNeighbourOrigin !== "" && config.selectedNodeNames.includes(d.NAME)) return "block";
+    if(config.currentLayout === "shortestPath") return "block";
+    if(!expandedAll && config.currentLayout === "default" && config.selectedNodeNames.includes(d.NAME)) return "block"
+    // if(d.NAME === config.nearestNeighbourOrigin || config.currentLayout === "shortestPath") return "block";
     return currentZoomLevel > 2 ? "block":"none";
   }
 
 
   function getNodeLabelDy  (d)  {
-    if(config.graphDataType !== "parameter") return d.radius * 1.8;
+    if(config.graphDataType !== "parameter") return d.radius * 2;
   //  if(config.graphDataType !== "parameter"  && d.type === "tier1") return d.radius + remToPx(currentZoomLevel);
     if(config.graphDataType !== "parameter") return d.radius + remToPx(0.6/currentZoomLevel);
     if(config.currentLayout === "nearestNeighbour" && d.id === config.nearestNeighbourOrigin) return d.radius + remToPx(0.4);
@@ -412,8 +415,8 @@ export default async function ForceGraph(
     return d.radius + remToPx(0.5);
   }
   function getNodeLabelSize (d)  {
-    if(config.graphDataType !== "parameter")return d.radius * 0.8;
-    if(config.graphDataType !== "parameter") return `${(LABEL_FONT_BASE_REM + 0.2)/currentZoomLevel}em`;
+    if(config.graphDataType !== "parameter")return d.radius;
+    // if(config.graphDataType !== "parameter") return `${(LABEL_FONT_BASE_REM + 0.2)/currentZoomLevel}em`;
     if(config.currentLayout === "nearestNeighbour" && d.id === config.nearestNeighbourOrigin) return `${LABEL_FONT_BASE_REM}rem`
     if(config.graphDataType === "parameter" && config.currentLayout === "default" && config.nearestNeighbourOrigin !== "") return `${LABEL_FONT_BASE_REM + 0.2}rem`;
     return `${LABEL_FONT_BASE_REM}rem`
@@ -516,6 +519,7 @@ export default async function ForceGraph(
       }, {})
       // save node positions
       config.setDefaultNodePositions(defaultNodePositions);
+      console.log(defaultNodePositions)
     }
     updatePositions(true );
 
@@ -1091,6 +1095,8 @@ export default async function ForceGraph(
     }
     // now get the links
     let chartLinks = showEle.links;
+    const expandedAll = config.selectedNodeNames.length === (config.showParameters ? config.totalNodeCount : config.noParameterNodeCount);
+
     // filter if NN or not expandedAll
     if(fromNearestNeighbourDefaultNodeClick ||  config.tooltipRadio !== "none"
     || (config.graphDataType === "parameter" && config.nearestNeighbourOrigin !== "")){
@@ -1102,6 +1108,9 @@ export default async function ForceGraph(
        chartLinks = showEle.links.filter((f) =>
          chartNodes.some((s) => s.NAME === getSourceId(f)) &&
          chartNodes.some((s) => s.NAME === getTargetId(f)));
+    } else if (!expandedAll && config.graphDataType === "parameter" && config.currentLayout === "default"){
+      chartLinks = showEle.links.filter((f) => config.selectedNodeNames.includes(getSourceId(f))
+        && config.selectedNodeNames.includes(getTargetId(f)));
     } else if (chartLinks.length > 2500){
       chartLinks = selectSpatiallyEvenLinks(showEle.links,chartNodes,2000);
       const allNodeNamesLength = config.showParameters ? config.totalNodeCount : config.noParameterNodeCount;
@@ -1623,7 +1632,7 @@ export default async function ForceGraph(
     if(nnViewChange){
       positionNearestNeighbours(true)
     }
-
+    resetNodeHighlight();
 
   }
   // simulation functions
@@ -2327,7 +2336,7 @@ function getTargetId(d) {
 function placeRectsOnOval (rects, aspectRatio = 1.5, gap = 8) {
   const totalArc = rects.reduce((s, d) => s + d.width + gap, 0);
   const maxDim = Math.max(...rects.map((d) => Math.max(d.width, d.height)));
-  const minRadius = maxDim * 0.85;
+  const minRadius = maxDim * 0.25;
 
   // Grow rx/ry at the given aspect ratio until circumference and centre hole are satisfied
   let ry = Math.max(
