@@ -133,6 +133,7 @@ export const zoomToFit = (baseSvg,currentNodes, transitionTime) => {
 }
 
 const resetMenuVisibility = () => {
+  expandedAll = config.graphDataType !== "parameter" || config.selectedNodeNames.length === (config.showParameters ? config.totalNodeCount : config.noParameterNodeCount);
   let buttonPosition = 2.9;
   const menuVisible = d3.select("#hideInfo").style("display") === "block";
   d3.select("unselectAll").style("display","none");
@@ -1095,7 +1096,7 @@ export default async function ForceGraph(
     }
     // now get the links
     let chartLinks = showEle.links;
-    const expandedAll = config.selectedNodeNames.length === (config.showParameters ? config.totalNodeCount : config.noParameterNodeCount);
+    expandedAll = config.selectedNodeNames.length === (config.showParameters ? config.totalNodeCount : config.noParameterNodeCount);
 
     // filter if NN or not expandedAll
     if(fromNearestNeighbourDefaultNodeClick ||  config.tooltipRadio !== "none"
@@ -1423,7 +1424,8 @@ export default async function ForceGraph(
           }
         }
       })
-      .on("mouseout", (event) => {
+      .on("mouseout", () => {
+        expandedAll = config.selectedNodeNames.length === (config.showParameters ? config.totalNodeCount : config.noParameterNodeCount);
         d3.select(".tooltipExtra").style("visibility","hidden");
           if(config.graphDataType === "parameter"){
             allNodeMouseout();
@@ -1442,6 +1444,8 @@ export default async function ForceGraph(
       })
       .on("click", (event, d) => {
         if (event.defaultPrevented) return; // dragged
+        // no click action in shortest path or nearest neighbour view
+        if(config.graphDataType === "parameter" && event.currentLayout !== "default") return;
         if(config.currentLayout === "default" && config.graphDataType === "parameter"){
           allNodeMouseout();
           // default click (NN 1 search but staying in this layout)
@@ -1878,7 +1882,7 @@ export default async function ForceGraph(
           .style("background-color","#484848");
         let tooltipText = matchingNode["DISPLAY NAME"];
         if(!tooltipText || tooltipText.length === 0){
-          tooltipText = rowId;
+          tooltipText = rowId.replace(/\\/g, '');
         }
         if(matchingNode["Parameter Explanation"]){
           tooltipText += `<br>${matchingNode["Parameter Explanation"]}`

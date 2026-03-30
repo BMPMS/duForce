@@ -129,7 +129,7 @@ label {
     border-radius: 0.1rem;
     border: 0.05rem solid black;
     color: #404040;
-    z-index: 30;
+    z-index: 1800;
 }
 
 .tooltip{
