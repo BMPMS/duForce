@@ -289,9 +289,10 @@ export default async function ForceGraph(
   const getSubModulePositions = () => {
 
 
-    const submoduleLeaves = config.hierarchyData.subModuleNodes.map((m) => ({name: m.id || m.data?.id,value: m.leaves().length}));
+    const submoduleLeaves = config.hierarchyData.subModuleNodes.map((m) =>  ({name: m.id || m.data?.id,value: d3.sum(m.leaves(), (s) => s.data.linkCount)}));
     const leafHierarchy = d3.hierarchy({name: 'root', children: submoduleLeaves})
       .sum((s) => s.value);
+    debugger;
     const tree = d3.treemap()
       .size([width,height]);
     tree(leafHierarchy);
@@ -324,8 +325,30 @@ export default async function ForceGraph(
     if(d.type === "tier2") return 0.6;
     if(d.type === "tier3") return 0.05;
   }
-  // Initialize simulation
+
   const simulation = d3
+    .forceSimulation()
+    .force("charge", d3.forceManyBody().strength(config.graphDataType !== "parameter"  ? 0 : -300))
+    .force("link", d3.forceLink().id((d) => d.id).strength((link) => {
+      const isParameter = link.source.data?.isParameter || link.target.data?.isParameter;
+      if(config.graphDataType !== "parameter" || isParameter){
+        return 0
+      } // default from https://d3js.org/d3-force/link as distance doesn't matter here
+      // return 0
+      return LINK_FORCE_STRENGTH
+    }))
+    .force("x", d3.forceX((d) => config.graphDataType === "parameter" ? submodulePositions[d.subModule].x :width/2).strength( config.graphDataType !== "parameter"  ? xWeight * 0.04 : xWeight * 0.15))
+    .force("y", d3.forceY((d) => config.graphDataType === "parameter" ? submodulePositions[d.subModule].y :width/2).strength( config.graphDataType !== "parameter"  ? yWeight * 0.04 :xWeight * 0.15))
+    .force("collide", d3.forceCollide() // change segment when ready
+      .radius((d) => d.radius * (config.graphDataType == "parameter" ? RADIUS_COLLIDE_MULTIPLIER : 4))
+      .strength(0.8)
+      .iterations(20)
+    ) // change segment when ready
+    .force("cluster", forceCluster()) // cluster all nodes belonging to the same submodule.
+    // change segment when ready
+
+  // Initialize simulation
+  const newSimulation = d3
     .forceSimulation()
     .force("charge", d3.forceManyBody().strength(config.graphDataType !== "parameter"  ? 0 : -300))
     .force("link", d3.forceLink().id((d) => d.id).strength((link) => {
@@ -1683,7 +1706,8 @@ export default async function ForceGraph(
 
 
   function forceCluster() {
-    const strength =  config.graphDataType === "parameter" ? 0.2 : 0.6 ;
+    //const strength =  config.graphDataType === "parameter" ? 0.3 : 0.6 ;
+    const strength = config.graphDataType === "parameter" ? 0.45 : 0.4
     const parentStrength = 0.05;
     let nodes;
     function force(alpha) {
