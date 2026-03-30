@@ -17,7 +17,7 @@ export const COLOR_SCALE_RANGE = [
 
 // node size range - always on a continuous scale based on the # of connections
 //export const NODE_RADIUS_RANGE = [1, 50];
-export const NODE_RADIUS_RANGE = [5,50];
+export const NODE_RADIUS_RANGE = [3,30];
 // keep them small for rendering (ie 1 to 50 is better than 15 to 100)
 // previous version (Sept 2025) was [6, 40];
 
@@ -27,7 +27,7 @@ export const NODE_RADIUS_RANGE_MACRO_MESO = [4,30];
 
 export const MACRO_MESO_RADII = [40,15,5]
 // FORCE PARAMETERS
-export const RADIUS_COLLIDE_MULTIPLIER = 1.3;
+export const RADIUS_COLLIDE_MULTIPLIER = 1.5;
 // the amount of space around the node - 2.5 * radius seems to work quite well
 // this is a play off between too much space and the labels overlapping
 
@@ -40,7 +40,7 @@ export const LINK_FORCE_STRENGTH = 0.1;
 // 1 was where you had it originally
 // it was on 0.2 for the previous demo...
 
-export const SIMULATION_TICK_TIME = 250; // 300 is the d3 default.
+export const SIMULATION_TICK_TIME = 450; // 300 is the d3 default.
 // I wouldn't recommend going lower than 300 as it needs time to place the nodes
 // You could experiment with higher, see if positioning is more optional - higher the value, longer it takes.
 
