@@ -44,7 +44,7 @@ export const SIMULATION_TICK_TIME = 450; // 300 is the d3 default.
 // I wouldn't recommend going lower than 300 as it needs time to place the nodes
 // You could experiment with higher, see if positioning is more optional - higher the value, longer it takes.
 
-export const LABEL_FONT_BASE_REM = 0.4;
+export const LABEL_FONT_BASE_REM = 0.6;
 // these are the messages top middle
 export const MESSAGES = {"noSP": "There is no shortest path between the selected nodes",
   "SP" : "Search for nodes to find the Shortest Path",
