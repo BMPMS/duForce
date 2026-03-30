@@ -81,7 +81,7 @@ const drawChartLinks = (svg, chartLinks) => {
     .attr("opacity",1)
     .attr("pointer-events", "none")
     .attr("stroke-opacity", (d) => getLinkAlpha(d,chartLinks.length))
-    .attr("stroke-width", config.graphDataType === "parameter" ? 0.75 : 1.25)
+    .attr("stroke-width", config.graphDataType === "parameter" ? 1.25 : 1.25)
     .attr("stroke", LINK_COLOR)
     .attr("fill","none");
 
@@ -285,6 +285,7 @@ export default async function ForceGraph(
   const yWeight = width > height ? 1 : 0.7;
 
 
+
   const getSubModulePositions = () => {
 
 
@@ -297,14 +298,32 @@ export default async function ForceGraph(
     const fixedOrder = ['submodule-1','submodule-10','submodule-3','submodule-2','submodule-5','submodule-4','submodule-7','submodule-11','submodule-8','submodule-9','submodule-6']
     const submoduleRects = leafHierarchy.descendants()
       .filter((f) => f.depth > 0)
-      .map((m) => ({width: m.x1 - m.x0, height: m.y1-m.y0, id: m.data.name}))
-      .sort((a,b) => d3.ascending(fixedOrder.findIndex((f) => f === a.id), fixedOrder.findIndex((f) => f === b.id)));
-    return placeRectsOnOval(submoduleRects,width/height);
+      .map((m) => ({x: m.x0 + (m.x1 - m.x0)/2, y: m.y0 + (m.y1 - m.y0)/2, id: m.data.name}));
+
+    const positions = submoduleRects
+      .reduce((acc, entry) => {
+        acc[entry.id] = {x: entry.x, y: entry.y}
+        return acc;
+      },{})
+
+    debugger;
+    return positions;
   }
 
 
 
   const submodulePositions = getSubModulePositions();
+
+  const radiusMax = d3.max(showEle.nodes, (d) => d.radius);
+  const parameterStrengthScale = d3.scaleLinear()
+    .domain([0,radiusMax])
+    .range([0.1,0.2])
+  const getXYStrength = (d) => {
+    if(config.graphDataType === "parameter") return parameterStrengthScale(d.radius);
+    if(d.type === "tier1") return 0.3;
+    if(d.type === "tier2") return 0.6;
+    if(d.type === "tier3") return 0.05;
+  }
   // Initialize simulation
   const simulation = d3
     .forceSimulation()
@@ -317,17 +336,25 @@ export default async function ForceGraph(
      // return 0
       return LINK_FORCE_STRENGTH
     }))
-    .force("x", d3.forceX((d) => config.graphDataType === "parameter" ? submodulePositions[d.subModule].x :width/2).strength( config.graphDataType !== "parameter"  ? xWeight * 0.04 : 0.1))
-    .force("y", d3.forceY((d) => config.graphDataType === "parameter" ? submodulePositions[d.subModule].y :width/2).strength( config.graphDataType !== "parameter"  ? yWeight * 0.04 :0.1))
+    .force("x", d3.forceX((d) => config.graphDataType === "parameter" ? submodulePositions[d.subModule].x :width/2).strength( config.graphDataType !== "parameter"  ? xWeight * 0.04 : xWeight * 0.05))
+    .force("y", d3.forceY((d) => config.graphDataType === "parameter" ? submodulePositions[d.subModule].y :width/2).strength( config.graphDataType !== "parameter"  ? yWeight * 0.04 :xWeight * 0.05))
+   // .force("x", d3.forceX(width/2).strength((d) => config.graphDataType !== "parameter"  ? xWeight * 0.04 : getXYStrength(d) * xWeight))
+   // .force("y", d3.forceY(height/2).strength((d) => config.graphDataType !== "parameter"  ? yWeight * 0.04 :getXYStrength(d) * yWeight))
+
     .force("collide", d3.forceCollide() // change segment when ready
       .radius((d) => d.radius * (config.graphDataType == "parameter" ? RADIUS_COLLIDE_MULTIPLIER : 4))
       .strength(1)
       .iterations(20)
     )
+   // .force("collide", d3.forceCollide() // change segment when ready
+   //   .radius((d) => config.graphDataType !== "parameter" ? d.radius * 4 : Math.min(d.radius * 1.2, 100))
+   //   .strength(0.8)
+   //   .iterations(config.graphDataType === "parameter" ? 20 : 3)
+   // ) // change segment when ready
 
-    if(config.graphDataType !== "parameter"){
+   // if(config.graphDataType !== "parameter"){
       simulation.force("cluster", forceCluster()) // cluster all nodes belonging to the same submodule.
-    }
+   // }
 
   simulation.stop();
 
@@ -518,6 +545,7 @@ export default async function ForceGraph(
         acc[node.id] = { x: node.x, y: node.y };
         return acc
       }, {})
+      console.log(defaultNodePositions)
       // save node positions
       config.setDefaultNodePositions(defaultNodePositions);
       console.log(defaultNodePositions)
@@ -1112,8 +1140,8 @@ export default async function ForceGraph(
     } else if (!expandedAll && config.graphDataType === "parameter" && config.currentLayout === "default"){
       chartLinks = showEle.links.filter((f) => config.selectedNodeNames.includes(getSourceId(f))
         && config.selectedNodeNames.includes(getTargetId(f)));
-    } else if (chartLinks.length > 2500){
-      chartLinks = selectSpatiallyEvenLinks(showEle.links,chartNodes,2000);
+    } else if (chartLinks.length > 4000){
+      chartLinks = selectSpatiallyEvenLinks(showEle.links,chartNodes,4000);
       const allNodeNamesLength = config.showParameters ? config.totalNodeCount : config.noParameterNodeCount;
       if(config.graphDataType === "parameter" && config.currentLayout === "default" && allNodeNamesLength === config.selectedNodeNames.length){
         config.setVisibleVariableLinks(chartLinks);
@@ -1246,7 +1274,7 @@ export default async function ForceGraph(
     simulation.nodes(showEle.nodes).force("link").links(chartLinks);
     simulation.alphaTarget(1).restart();
     // stop at calculated tick time (from previous dev)
-    simulation.tick(1200);
+    simulation.tick(SIMULATION_TICK_TIME);
     simulation.stop();
       // after all that, reset setQuildMesoUrlExtras
       config.setMacroMesoUrlExtras([]);
@@ -1445,7 +1473,7 @@ export default async function ForceGraph(
       .on("click", (event, d) => {
         if (event.defaultPrevented) return; // dragged
         // no click action in shortest path or nearest neighbour view
-        if(config.graphDataType === "parameter" && event.currentLayout !== "default") return;
+        if(config.graphDataType === "parameter" && config.currentLayout !== "default") return;
         if(config.currentLayout === "default" && config.graphDataType === "parameter"){
           allNodeMouseout();
           // default click (NN 1 search but staying in this layout)
@@ -1655,7 +1683,7 @@ export default async function ForceGraph(
 
 
   function forceCluster() {
-    const strength =  0.6 ;
+    const strength =  config.graphDataType === "parameter" ? 0.2 : 0.6 ;
     const parentStrength = 0.05;
     let nodes;
     function force(alpha) {
@@ -2340,7 +2368,7 @@ function getTargetId(d) {
 function placeRectsOnOval (rects, aspectRatio = 1.5, gap = 8) {
   const totalArc = rects.reduce((s, d) => s + d.width + gap, 0);
   const maxDim = Math.max(...rects.map((d) => Math.max(d.width, d.height)));
-  const minRadius = maxDim * 0.25;
+  const minRadius = maxDim * 0.5;
 
   // Grow rx/ry at the given aspect ratio until circumference and centre hole are satisfied
   let ry = Math.max(
