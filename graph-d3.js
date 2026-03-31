@@ -1754,7 +1754,8 @@ export default async function ForceGraph(
     let content = [];
     const nnNode = showEle.nodes.find((f) => f.NAME === config.nearestNeighbourOrigin);
     if(nnNode) {
-      content = [`<div class="tooltipTableContents" style="white-space: nowrap; text-overflow: ellipsis; background-color :${nnNode.color}">${nnNode.NAME.toUpperCase()}${nnNode["DISPLAY NAME"] ? " - " : ""}${nnNode["DISPLAY NAME"] || ""}</div>
+
+      content = [`<div class="tooltipTableContents" style="white-space: nowrap; text-overflow: ellipsis; background-color :${nnNode.color}">${nnNode.NAME.toUpperCase()}${nnNode["DISPLAY_NAME"] ? " - " : ""}${nnNode["DISPLAY_NAME"] || ""}</div>
             <div id="directionToggle">
              <label><input type="radio" class="directionToggle" name="directionToggle" value="both" ${config.tooltipRadio === "both" ? "checked" : ""}>both</label>
              <label><input type="radio" class="directionToggle" name="directionToggle" value="in" ${config.tooltipRadio === "in" ? "checked" : ""}>only &larr;</label>
@@ -1804,7 +1805,7 @@ export default async function ForceGraph(
           nodeRows.push({row: `<tr id="${CSS.escape(matchingNode.NAME)}">
             ${config.graphDataType === "parameter" ? `<td  style='pointer-events: none; background-color:${matchingNode.color}; color: white; width:30%;'>${matchingNode.SEGMENT_NAME}</td>`: ""}
             <td class="tableCell" id='${CSS.escape(matchingNode.NAME)}' style="width:35%;">${directionUnicode} ${nodeName}</td>
-            <td class="tableCell" id='${CSS.escape(matchingNode.NAME)}' style="width:35%;">${matchingNode["DISPLAY NAME"] || ""}</td>
+            <td class="tableCell" id='${CSS.escape(matchingNode.NAME)}' style="width:35%;">${matchingNode["DISPLAY_NAME"] || ""}</td>
             ${shortestPathCell} ${nearestNeighbourCell}
             </tr>`, subModule: matchingNode.SUBMODULE_NAME, name: matchingNode.NAME}); // tooltip title
         }
