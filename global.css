@@ -664,11 +664,12 @@ input[type="range"] {
     color: white;
     z-index: 3000;
     width: 60vw;
-    height: 80vh;
+    height: 20vh;
     padding: 1rem;
     position: fixed;
     top: 50%;
     left: 50%;
+    font-size: 1rem;
     transform: translate(-50%, -50%);
     border: 0.075rem solid white;
     visibility: hidden;

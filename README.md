@@ -16,6 +16,20 @@ f) uncomment getData() and comment getConvertedData()
 g) make sure the nodes load correctly
 h) delete nodes.json and edges.json from assets
 
+NODE POSITIONS
+
+i) after you've finished you'll need to save the nodePositions at the 3 different aspect ratios - square, landscape + portrait
+j) step 1 go to constants and change useDefaults to false
+k) run the variable simulation for each of the sizes.  It will take a few minutes, don't worry.
+after the simulation is complete the node positions are written to the console on every load
+l) copy these (right click, copy object on a Mac) + then paste into the relevant file in the assets folder
+* portrait (346 × 750 px, aspect ratio 1.46)
+* landscape (1001 × 563 px, aspect ratio 1.78)
+it doesn't matter as long as the window is clearly portrait, landscape or square
+m) double check you've copied to the assets folder (docs is overwritten on build)
+n) when down, go to constants and change useDefaults back to true
+
+
 2. Running the app locally
 
 

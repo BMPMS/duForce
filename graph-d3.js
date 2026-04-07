@@ -292,7 +292,6 @@ export default async function ForceGraph(
     const submoduleLeaves = config.hierarchyData.subModuleNodes.map((m) =>  ({name: m.id || m.data?.id,value: d3.sum(m.leaves(), (s) => s.data.linkCount)}));
     const leafHierarchy = d3.hierarchy({name: 'root', children: submoduleLeaves})
       .sum((s) => s.value);
-    debugger;
     const tree = d3.treemap()
       .size([width,height]);
     tree(leafHierarchy);
@@ -307,7 +306,6 @@ export default async function ForceGraph(
         return acc;
       },{})
 
-    debugger;
     return positions;
   }
 
@@ -338,11 +336,11 @@ export default async function ForceGraph(
       return LINK_FORCE_STRENGTH
     }))
     .force("x", d3.forceX((d) => config.graphDataType === "parameter" ? submodulePositions[d.subModule].x :width/2).strength( config.graphDataType !== "parameter"  ? xWeight * 0.04 : xWeight * 0.15))
-    .force("y", d3.forceY((d) => config.graphDataType === "parameter" ? submodulePositions[d.subModule].y :width/2).strength( config.graphDataType !== "parameter"  ? yWeight * 0.04 :xWeight * 0.15))
+    .force("y", d3.forceY((d) => config.graphDataType === "parameter" ? submodulePositions[d.subModule].y :width/2).strength( config.graphDataType !== "parameter"  ? yWeight * 0.04 :yWeight * 0.15))
     .force("collide", d3.forceCollide() // change segment when ready
       .radius((d) => d.radius * (config.graphDataType == "parameter" ? RADIUS_COLLIDE_MULTIPLIER : 4))
-      .strength(0.8)
-      .iterations(20)
+      .strength(1)
+      .iterations(30)
     ) // change segment when ready
     .force("cluster", forceCluster()) // cluster all nodes belonging to the same submodule.
     // change segment when ready
@@ -451,22 +449,28 @@ export default async function ForceGraph(
     if(config.nearestNeighbourOrigin !== "" && config.selectedNodeNames.includes(d.NAME)) return "block";
     if(config.currentLayout === "shortestPath") return "block";
     if(!expandedAll && config.currentLayout === "default" && config.selectedNodeNames.includes(d.NAME)) return "block"
-    // if(d.NAME === config.nearestNeighbourOrigin || config.currentLayout === "shortestPath") return "block";
-    return currentZoomLevel > 2 ? "block":"none";
+    return "none";
   }
 
 
+  const minAsPx = remToPx(LABEL_FONT_BASE_REM);
+
   function getNodeLabelDy  (d)  {
-    if(config.graphDataType !== "parameter") return d.radius * 2;
-  //  if(config.graphDataType !== "parameter"  && d.type === "tier1") return d.radius + remToPx(currentZoomLevel);
-    if(config.graphDataType !== "parameter") return d.radius + remToPx(0.6/currentZoomLevel);
+    if(config.graphDataType !== "parameter")  {
+      const fontSize =  d.radius < minAsPx ? minAsPx : d.radius;
+      return d.radius + fontSize;
+    };
     if(config.currentLayout === "nearestNeighbour" && d.id === config.nearestNeighbourOrigin) return d.radius + remToPx(0.4);
     if(config.graphDataType === "parameter" && config.currentLayout === "default" && config.nearestNeighbourOrigin !== "") return d.radius + remToPx(0.6);
 
     return d.radius + remToPx(0.5);
   }
+
   function getNodeLabelSize (d)  {
-    if(config.graphDataType !== "parameter")return d.radius;
+
+    if(config.graphDataType !== "parameter"){
+      return d.radius < minAsPx ? minAsPx : d.radius;
+    }
     // if(config.graphDataType !== "parameter") return `${(LABEL_FONT_BASE_REM + 0.2)/currentZoomLevel}em`;
     if(config.currentLayout === "nearestNeighbour" && d.id === config.nearestNeighbourOrigin) return `${LABEL_FONT_BASE_REM}rem`
     if(config.graphDataType === "parameter" && config.currentLayout === "default" && config.nearestNeighbourOrigin !== "") return `${LABEL_FONT_BASE_REM + 0.2}rem`;
@@ -480,7 +484,6 @@ export default async function ForceGraph(
       svg.selectAll(".nodeLabel")
         .attr("dy",getNodeLabelDy)
         .attr("font-size",getNodeLabelSize)
-        .style("display",getNodeLabelDisplay);
     });
 
   baseSvg.call(zoom).on("dblclick.zoom", null);
@@ -531,6 +534,7 @@ export default async function ForceGraph(
           const tooltipContent = getTooltipTable(filteredListToShow,{});
           tooltip.html(`${tooltipContent.join("")}`)
           const nodeNames = filteredListToShow.map((m) => m.name).concat(config.nearestNeighbourOrigin);
+          console.log ("HERE!!!!! - tooltip")
           svg.selectAll(".nodeOpacityCircle")
             .attr("opacity", (d) =>  nodeNames.includes(d.NAME) ? 1 : 0.2);
           svg.selectAll(".allLinkPaths")
@@ -1344,6 +1348,7 @@ export default async function ForceGraph(
 
       // tone down links, nodes and remove paths
       svg.selectAll(".allLinkPaths").style("display", "none");
+      console.log('HERE!!!! highlighting')
       svg.selectAll(".nodesGroup").attr("opacity",(d) => d.id === currentNodeId ? 1 : 0.2);
 
       svg.selectAll(".allLinkPaths")
@@ -1433,7 +1438,9 @@ export default async function ForceGraph(
         return enter;
       });
 
-    nodesGroup.attr("transform", (d) => `translate(${d.x},${d.y})`)
+    nodesGroup
+      .attr("opacity",1)
+      .attr("transform", (d) => `translate(${d.x},${d.y})`)
       .on("mouseover",(event,d) => {
         tooltip.style("visibility", "hidden");
         if(config.graphDataType !== "parameter"){
@@ -1468,6 +1475,8 @@ export default async function ForceGraph(
             svg.selectAll(".allLinkPaths")
               .filter((f) => d.nnLinkIds.includes(f.source.id) && d.nnLinkIds.includes(f.target.id))
               .style("display","block");
+             console.log('HERE!!!! mouseover')
+
             svg.selectAll(".nodesGroup")
               .attr("opacity",0.2)
               .filter((f) =>  d.nnLinkIds.includes(f.id))
@@ -1707,7 +1716,7 @@ export default async function ForceGraph(
 
   function forceCluster() {
     //const strength =  config.graphDataType === "parameter" ? 0.3 : 0.6 ;
-    const strength = config.graphDataType === "parameter" ? 0.45 : 0.4
+    const strength = config.graphDataType === "parameter" ? 0.2 : 0.4
     const parentStrength = 0.05;
     let nodes;
     function force(alpha) {

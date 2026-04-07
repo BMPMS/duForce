@@ -9,7 +9,7 @@ export const resetNodeHighlight = () => {
   const expandedAll = config.selectedNodeNames.length === (config.showParameters ? config.totalNodeCount : config.noParameterNodeCount);
   const svg = d3.select(".chartGroup");
   svg.selectAll(".nodeOpacityCircle")
-    .attr("opacity", (d) => expandedAll || config.currentLayout !== "default" ? 1 :
+    .attr("opacity", (d) => expandedAll || config.graphDataType !== "parameter" || config.currentLayout !== "default" ? 1 :
       config.selectedNodeNames.includes(d.NAME) ? 1 : 0.2)
 
 }
@@ -128,7 +128,9 @@ const changeChartViewType = (svg, selectedNodeNamesCopy,event) => {
   d3.select(".animation-container").style("display", "flex");
   d3.select(".tooltip").style("visibility","hidden");
   d3.selectAll("#search-input").property("value","");
-  d3.select("#collapsibleMenuToggle")
+
+
+      d3.select("#collapsibleMenuToggle")
     .style("display",currentLayout === "parameter" ? "block" : "none");
   config.setShortestPathString("");
   config.setGraphDataType(currentLayout);
@@ -330,6 +332,13 @@ const saveSvgAsImage = (filename = 'image.png', type = 'image/png') => {
   // for download image button
   const scale = 3;
   const svgElement = d3.select(".baseSvg").node();
+  const styleElement = document.createElement('style');
+  styleElement.textContent = `
+  @import url('https://fonts.googleapis.com/css2?family=Lato:wght@400;700&display=swap');
+  text { font-family: 'Lato', sans-serif; }
+`;
+  svgElement.insertBefore(styleElement, svgElement.firstChild);
+
   const svgString = new XMLSerializer().serializeToString(svgElement);
   const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
   const url = URL.createObjectURL(svgBlob);
