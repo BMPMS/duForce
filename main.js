@@ -409,14 +409,31 @@ async function getConvertedData () {
 
     //const [response1, response2] = await Promise.all([fetch("/api/nodes", params), fetch("/api/edges", params)]);
     const [response1] = await Promise.all([fetch(`${import.meta.env.BASE_URL}assets/convertedData.json`),]);
-
-
     if (!response1.ok) {
-      throw new Error(`HTTP error! Status: ${response1.status} ${response2.status}`);
+      throw new Error(`HTTP error! Status: ${response1.status}`);
+    }
+
+    const aspectRatio = window.innerWidth/window.innerHeight;
+    let nodeFilename = "defaultNodePositions_square.json";
+    if(Number(aspectRatio)){
+      if(aspectRatio > 1.1) {
+        nodeFilename = "defaultNodePositions_landscape.json";
+      } else if (aspectRatio < 1.1){
+        nodeFilename = "defaultNodePositions_portrait.json";
+      }
+    }
+
+    const [response2] = await Promise.all([fetch(`${import.meta.env.BASE_URL}assets/${nodeFilename}`),]);
+    if (!response2.ok) {
+      throw new Error(`HTTP error! Status: ${response2.status} `);
+    }
+    const nodePositions = await response2.json();
+    if(useDefaults){
+      config.setDefaultNodePositions(nodePositions);
     }
 
     const convertedData = await response1.json();
-    const {parameterData, hierarchyData, mmLinks,segmentSubmoduleMapper, defaultNodePositions} = convertedData;
+    const {parameterData, hierarchyData, mmLinks,segmentSubmoduleMapper} = convertedData;
 
     config.setParameterData(parameterData);
 
@@ -456,9 +473,7 @@ async function getConvertedData () {
       config.setAllNodeNames(parameterData.nodes.map((m) => m.id))
       config.setNoParameterAllNodeNames(parameterData.nodes.filter((f) => !f.isParameter).map((m) => m.id))
       config.setSelectedNodeNames(config.showParameters ? parameterData.nodes.map((m) => m.id) : parameterData.nodes.filter((f) => !f.isParameter).map((m) => m.id));
-      if(useDefaults){
-        config.setDefaultNodePositions(defaultNodePositions)
-      }
+
       // call the tree
       VariableTree(treeData);
   } catch (error) {
@@ -555,5 +570,18 @@ if(!config.initialLoadComplete){
   // g) uncomment getData() and comment getConvertedData()
   // h) make sure the nodes load correctly
   // i) delete nodes.json and edges.json from assets
+
+  // NODE POSITIONS
+
+  // j) after you've finished you'll need to save the nodePositions at the 3 different aspect ratios - square, landscape + portrait
+  // h) step 1 go to constants and change useDefaults to false
+  // i) run the variable simulation for each of the sizes.  It will take a few minutes, don't worry.
+  // after the simulation is complete the node positions are written to the console on every load
+  // you'll need to copy these (right click, copy object on a Mac) + then paste into the relevant file in the assets folder
+  // portrait (346 × 750 px, aspect ratio 1.46)
+  // landscape (1001 × 563 px, aspect ratio 1.78)
+  // it doesn't matter as long as the window is clearly portrait, landscape or square
+  // double check you've copied to the assets folder (docs is overwritten on build)
+  // when down, go to constants and change useDefaults back to true
 
 }
