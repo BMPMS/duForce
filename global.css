@@ -704,9 +704,9 @@ input[type="range"] {
 .infoButtonContainer {
     visibility: hidden;
     position: fixed;
-    top: calc(50% - 40vh); /* 50% down minus half the modal height */
+    top: calc(50% - 10vh); /* 50% down minus half the modal height */
     left: calc(50% + 30vw - 2rem); /* 50% across + half modal width - offset */
-    z-index: 1001; /* Must be above the modal */
+    z-index: 3001; /* Must be above the modal */
 }
 .infoButtonContainer.active {
     visibility: visible;

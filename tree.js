@@ -1,5 +1,5 @@
 import * as d3 from "d3";
-import { COLOR_SCALE_RANGE, MESSAGES } from "./constants";
+import { COLOR_SCALE_RANGE, MESSAGES, useDefaults } from "./constants";
 import { config } from "./config";
 import {zoomToFit} from "./graph-d3";
 import ForceGraph from "./graph-d3";
@@ -10,7 +10,10 @@ export const resetNodeHighlight = () => {
   const svg = d3.select(".chartGroup");
   svg.selectAll(".nodeOpacityCircle")
     .attr("opacity", (d) => expandedAll || config.graphDataType !== "parameter" || config.currentLayout !== "default" ? 1 :
-      config.selectedNodeNames.includes(d.NAME) ? 1 : 0.2)
+      config.selectedNodeNames.includes(d.NAME) ? 1 : 0.2);
+
+  svg.selectAll(".nodeLabel")
+    .style("display",(d) => config.graphDataType !== "parameter" || config.currentLayout !== "default" || config.selectedNodeNames.includes(d.NAME) && !expandedAll ? 'block' : 'none')
 
 }
 export function getUrlId (str)  {
@@ -164,6 +167,7 @@ const changeChartViewType = (svg, selectedNodeNamesCopy,event) => {
 const toggleShowParameters = (event) => {
 
   d3.select(".animation-container").style("display", "flex");
+  d3.select(`#search-input`).property("value", "");
   const showParameters = event.target.checked;
   config.setShowParameters(showParameters);
   config.setCurrentLayout("default");
@@ -453,7 +457,7 @@ export default function VariableTree(data) {
   }
 
   drawTree();
-  renderGraph(true,false);
+  renderGraph(!useDefaults || config.graphDataType !== 'parameter',false);
 
   // finally, set various buttons
 

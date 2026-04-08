@@ -214,6 +214,7 @@ export default async function ForceGraph(
 
   } = {}
 ) {
+  debugger;
 
   expandedAll = config.graphDataType !== "parameter" || config.selectedNodeNames.length === (config.showParameters ? config.totalNodeCount : config.noParameterNodeCount);
   if(nearestNeighbour){
@@ -295,34 +296,18 @@ export default async function ForceGraph(
     const tree = d3.treemap()
       .size([width,height]);
     tree(leafHierarchy);
-    const fixedOrder = ['submodule-1','submodule-10','submodule-3','submodule-2','submodule-5','submodule-4','submodule-7','submodule-11','submodule-8','submodule-9','submodule-6']
     const submoduleRects = leafHierarchy.descendants()
       .filter((f) => f.depth > 0)
       .map((m) => ({x: m.x0 + (m.x1 - m.x0)/2, y: m.y0 + (m.y1 - m.y0)/2, id: m.data.name}));
 
-    const positions = submoduleRects
+    return submoduleRects
       .reduce((acc, entry) => {
         acc[entry.id] = {x: entry.x, y: entry.y}
         return acc;
-      },{})
-
-    return positions;
+      },{});
   }
-
-
 
   const submodulePositions = getSubModulePositions();
-
-  const radiusMax = d3.max(showEle.nodes, (d) => d.radius);
-  const parameterStrengthScale = d3.scaleLinear()
-    .domain([0,radiusMax])
-    .range([0.1,0.2])
-  const getXYStrength = (d) => {
-    if(config.graphDataType === "parameter") return parameterStrengthScale(d.radius);
-    if(d.type === "tier1") return 0.3;
-    if(d.type === "tier2") return 0.6;
-    if(d.type === "tier3") return 0.05;
-  }
 
   const simulation = d3
     .forceSimulation()
@@ -338,44 +323,11 @@ export default async function ForceGraph(
     .force("x", d3.forceX((d) => config.graphDataType === "parameter" ? submodulePositions[d.subModule].x :width/2).strength( config.graphDataType !== "parameter"  ? xWeight * 0.04 : xWeight * 0.15))
     .force("y", d3.forceY((d) => config.graphDataType === "parameter" ? submodulePositions[d.subModule].y :width/2).strength( config.graphDataType !== "parameter"  ? yWeight * 0.04 :yWeight * 0.15))
     .force("collide", d3.forceCollide() // change segment when ready
-      .radius((d) => d.radius * (config.graphDataType == "parameter" ? RADIUS_COLLIDE_MULTIPLIER : 4))
+      .radius((d) => d.radius * (config.graphDataType === "parameter" ? RADIUS_COLLIDE_MULTIPLIER : 4))
       .strength(1)
       .iterations(30)
     ) // change segment when ready
     .force("cluster", forceCluster()) // cluster all nodes belonging to the same submodule.
-    // change segment when ready
-
-  // Initialize simulation
-  const newSimulation = d3
-    .forceSimulation()
-    .force("charge", d3.forceManyBody().strength(config.graphDataType !== "parameter"  ? 0 : -300))
-    .force("link", d3.forceLink().id((d) => d.id).strength((link) => {
-      const isParameter = link.source.data?.isParameter || link.target.data?.isParameter;
-      if(config.graphDataType !== "parameter" || isParameter){
-        return 0
-      } // default from https://d3js.org/d3-force/link as distance doesn't matter here
-     // return 0
-      return LINK_FORCE_STRENGTH
-    }))
-    .force("x", d3.forceX((d) => config.graphDataType === "parameter" ? submodulePositions[d.subModule].x :width/2).strength( config.graphDataType !== "parameter"  ? xWeight * 0.04 : xWeight * 0.05))
-    .force("y", d3.forceY((d) => config.graphDataType === "parameter" ? submodulePositions[d.subModule].y :width/2).strength( config.graphDataType !== "parameter"  ? yWeight * 0.04 :xWeight * 0.05))
-   // .force("x", d3.forceX(width/2).strength((d) => config.graphDataType !== "parameter"  ? xWeight * 0.04 : getXYStrength(d) * xWeight))
-   // .force("y", d3.forceY(height/2).strength((d) => config.graphDataType !== "parameter"  ? yWeight * 0.04 :getXYStrength(d) * yWeight))
-
-    .force("collide", d3.forceCollide() // change segment when ready
-      .radius((d) => d.radius * (config.graphDataType == "parameter" ? RADIUS_COLLIDE_MULTIPLIER : 4))
-      .strength(1)
-      .iterations(20)
-    )
-   // .force("collide", d3.forceCollide() // change segment when ready
-   //   .radius((d) => config.graphDataType !== "parameter" ? d.radius * 4 : Math.min(d.radius * 1.2, 100))
-   //   .strength(0.8)
-   //   .iterations(config.graphDataType === "parameter" ? 20 : 3)
-   // ) // change segment when ready
-
-   // if(config.graphDataType !== "parameter"){
-      simulation.force("cluster", forceCluster()) // cluster all nodes belonging to the same submodule.
-   // }
 
   simulation.stop();
 
@@ -438,13 +390,12 @@ export default async function ForceGraph(
     .attr("stroke-linejoin", "round")
     .attr("d", "M1, -4L9,0L1,4") // M9,-4L1,0L9,4 (start)
 
-
-
   // zoom and zoom functions
   let currentZoomLevel = 1;
 
   // node visibility can depend on zoom level
   const getNodeLabelDisplay = (d) => {
+    expandedAll = config.selectedNodeNames.length === (config.showParameters ? config.totalNodeCount : config.noParameterNodeCount);
     if(config.graphDataType !== "parameter") return "block";
     if(config.nearestNeighbourOrigin !== "" && config.selectedNodeNames.includes(d.NAME)) return "block";
     if(config.currentLayout === "shortestPath") return "block";
@@ -452,14 +403,13 @@ export default async function ForceGraph(
     return "none";
   }
 
-
   const minAsPx = remToPx(LABEL_FONT_BASE_REM);
 
   function getNodeLabelDy  (d)  {
     if(config.graphDataType !== "parameter")  {
       const fontSize =  d.radius < minAsPx ? minAsPx : d.radius;
       return d.radius + fontSize;
-    };
+    }
     if(config.currentLayout === "nearestNeighbour" && d.id === config.nearestNeighbourOrigin) return d.radius + remToPx(0.4);
     if(config.graphDataType === "parameter" && config.currentLayout === "default" && config.nearestNeighbourOrigin !== "") return d.radius + remToPx(0.6);
 
@@ -534,7 +484,6 @@ export default async function ForceGraph(
           const tooltipContent = getTooltipTable(filteredListToShow,{});
           tooltip.html(`${tooltipContent.join("")}`)
           const nodeNames = filteredListToShow.map((m) => m.name).concat(config.nearestNeighbourOrigin);
-          console.log ("HERE!!!!! - tooltip")
           svg.selectAll(".nodeOpacityCircle")
             .attr("opacity", (d) =>  nodeNames.includes(d.NAME) ? 1 : 0.2);
           svg.selectAll(".allLinkPaths")
@@ -550,7 +499,7 @@ export default async function ForceGraph(
       })
   }
 
-  if (!initial && config.currentLayout === "default" && config.graphDataType === "parameter" && Object.keys(config.defaultNodePositions).length > 0) {
+  if (!initial &&  config.graphDataType === "parameter" && Object.keys(config.defaultNodePositions).length > 0) {
     // not initial load OR positioning currently saved
     // for default, reset positions and re-run the simulation
     resetDefaultNodes();
@@ -572,13 +521,11 @@ export default async function ForceGraph(
         acc[node.id] = { x: node.x, y: node.y };
         return acc
       }, {})
-      console.log(defaultNodePositions)
-      // save node positions
+       // save node positions
       config.setDefaultNodePositions(defaultNodePositions);
       console.log(defaultNodePositions)
     }
     updatePositions(true );
-
   }
 
   let searchNodes = showEle.nodes;
@@ -655,11 +602,11 @@ export default async function ForceGraph(
     return arr;
   }
 
-  function renderNNLevelLabels (svg,nnData) {
+  function renderNNLevelLabels (svg,nnData,linkCount) {
 
     // render (or unrenders) the level titles
     const nnWidth = 1500;
-    const nnHeight = 3000;
+    const nnHeight = Math.max(300,linkCount * 3);
 
     svg.selectAll(".nnLabelGroup")
       .attr("display","block");
@@ -707,7 +654,7 @@ export default async function ForceGraph(
      // get the links
     const nnLinks = getNearestNeighbourLinks();
 
-    const {nnWidth, nnHeight} = renderNNLevelLabels(svg,nodeClick ? [] : generateSymmetricNNArray(nnLinks));
+    const {nnWidth, nnHeight} = renderNNLevelLabels(svg,nodeClick ? [] : generateSymmetricNNArray(nnLinks),nnLinks.length);
 
     const getNNHierarchy = (parentId, id, direction, rootLink) =>  d3
       .stratify()
@@ -729,7 +676,7 @@ export default async function ForceGraph(
     // calculate the maximum column radius for each depth direction
     const radiusByDepthDirection = nnLinks.reduce((acc, link) => {
       const depthDirection = `${link.depth}-${link.direction}`;
-      if(!acc[depthDirection]){acc[depthDirection] = 0};
+      if(!acc[depthDirection]){acc[depthDirection] = 0}
       const matchingNode = showEle.nodes.find((f) => f.NAME === link[link.direction === "outbound" ? "source" : "target"]);
       acc[depthDirection] += (matchingNode.radius * radiusMultiple);
       return acc;
@@ -851,6 +798,7 @@ export default async function ForceGraph(
       const currentNode = showEle.nodes.find((f) => f.id === config.nearestNeighbourOrigin)
       updateTooltip(currentNode,false);
       d3.select(".animation-container").style("display", "none");
+      svg.selectAll(".nodeLabel").style("display", getNodeLabelDisplay);
     } else {
       updatePositions(true,nodeClick);
     }
@@ -961,8 +909,6 @@ export default async function ForceGraph(
     }
     // otherwise do nothing - no current click action for submodule or segment
   }
-
-
   function selectSpatiallyEvenLinks(
     links,
     nodes,
@@ -1064,7 +1010,6 @@ export default async function ForceGraph(
         }
       }
     }
-
     // --- 5. Fill remaining slots with spatially distributed links ---
     while (selected.size < subsetSize && bucketKeys.length > 0) {
       for (let i = bucketKeys.length - 1; i >= 0; i--) {
@@ -1233,7 +1178,7 @@ export default async function ForceGraph(
         }
       })
 
-      const clickParameter = (parameterNode, updateUrl) => {
+      const clickParameter = (parameterNode) => {
         if(!parameterNode) return;
         // if node exist - 'click it' and reset url string
         parameterNode.clicked = true;
@@ -1281,6 +1226,7 @@ export default async function ForceGraph(
       } else {
         const clickedNode = showEle.nodes.find((f) => f.id === config.clickedMMVariable);
         clickedNode.clicked = true;
+        console.log('adding value')
         d3.select(`#search-input`).property("value", config.clickedMMVariable);
 
       }
@@ -1310,6 +1256,7 @@ export default async function ForceGraph(
     drawChartLinks(svg, chartLinks);
 
     const dragged = (event, node) => {
+      if(config.graphDataType === "parameter" && config.currentLayout !== "default") return;
       // resetting data for affected nodes only rather than running updatePositions again
       // because render time was so much faster
       // reset node data
@@ -1333,6 +1280,7 @@ export default async function ForceGraph(
     }
 
     const dragended = (event, node) => {
+      if(config.graphDataType === "parameter" && config.currentLayout !== "default") return;
       node.x = event.x;
       node.y = event.y;
       if(config.graphDataType === "parameter"){
@@ -1348,7 +1296,6 @@ export default async function ForceGraph(
 
       // tone down links, nodes and remove paths
       svg.selectAll(".allLinkPaths").style("display", "none");
-      console.log('HERE!!!! highlighting')
       svg.selectAll(".nodesGroup").attr("opacity",(d) => d.id === currentNodeId ? 1 : 0.2);
 
       svg.selectAll(".allLinkPaths")
@@ -1365,7 +1312,7 @@ export default async function ForceGraph(
           d3.select(objects[i])
             .style("display","block");
         })
-    };
+    }
 
     const allNodeMouseout = () => {
       svg.selectAll(".nodesGroup").attr("opacity",1);
@@ -1475,7 +1422,6 @@ export default async function ForceGraph(
             svg.selectAll(".allLinkPaths")
               .filter((f) => d.nnLinkIds.includes(f.source.id) && d.nnLinkIds.includes(f.target.id))
               .style("display","block");
-             console.log('HERE!!!! mouseover')
 
             svg.selectAll(".nodesGroup")
               .attr("opacity",0.2)
@@ -1795,7 +1741,7 @@ export default async function ForceGraph(
        </tr></thead><tbody>`
       content.push(tableStart);
       let nodeRows = []
-      listToShow.forEach((d,i) => {
+      listToShow.forEach((d) => {
         let directionUnicode = "";
         if(d.direction && d.direction !== "centre"){
           directionUnicode = d.direction === "in" ? ` (&larr;)` : ` (&rarr;)`
@@ -1880,7 +1826,7 @@ export default async function ForceGraph(
     activateTooltipToggle();
 
     d3.selectAll(".shortestPathLink")
-      .on("mouseover", (event, d) => {
+      .on("mouseover", (event) => {
         showTooltipExtra(event.x, event.y, `click to see Shortest Path from ${config.nearestNeighbourOrigin} to ${event.currentTarget.id}`)
       })
       .on("mouseout", () => {
@@ -1906,7 +1852,7 @@ export default async function ForceGraph(
       })
 
     d3.selectAll(".nearestNeighbourLink")
-      .on("mouseover", (event, d) => {
+      .on("mouseover", (event) => {
         showTooltipExtra(event.x, event.y, `click to reset Nearest Neighbour to ${event.currentTarget.id}`)
       })
       .on("mouseout", () => {
@@ -2302,8 +2248,10 @@ export default async function ForceGraph(
       }
       const fuseData = config.graphDataType === "parameter" ? variableData : filteredNodes;
       const fuseOptions = {keys:  ["NAME", "DISPLAY_NAME","DEFINITION"], threshold:0.4};
+
       const fuse = new Fuse(fuseData, fuseOptions);
       const result = fuse.search(input);
+
 
       // from Chat GPT (with some help)
       // If you want exact matches to come at the very top, you can filter first for exact matches
@@ -2317,7 +2265,8 @@ export default async function ForceGraph(
 
     // Function to update the suggestions dropdown
     const updateSuggestions = (input) => {
-
+      // clear clicked variable history
+      config.setMMClickedVariable("");
       const filteredSuggestions = filterSuggestions(input);
       suggestionsContainer.innerHTML = "";
       // cheat as only just realised the old code was creating a suggestion each time - bad practice!
@@ -2364,9 +2313,7 @@ export default async function ForceGraph(
       updateSuggestions(inputValue);
 
     });
-
   }
-
 }
 
 const initGraphologyGraph = (nodes, links) => {
@@ -2390,79 +2337,9 @@ const initGraphologyGraph = (nodes, links) => {
 
   return graph;
 }
-
 function getSourceId(d) {
   return d.source && (d.source.id ? d.source.id : d.source);
 }
 function getTargetId(d) {
   return d.target && (d.target.id ? d.target.id : d.target);
-}
-
-// used for finding submodule 'centres' in parameter view
-function placeRectsOnOval (rects, aspectRatio = 1.5, gap = 8) {
-  const totalArc = rects.reduce((s, d) => s + d.width + gap, 0);
-  const maxDim = Math.max(...rects.map((d) => Math.max(d.width, d.height)));
-  const minRadius = maxDim * 0.5;
-
-  // Grow rx/ry at the given aspect ratio until circumference and centre hole are satisfied
-  let ry = Math.max(
-    minRadius,
-    (totalArc / (2 * Math.PI) / Math.sqrt(aspectRatio)) * 0.9
-  );
-  let rx = ry * aspectRatio;
-
-  for (let i = 0; i < 80; i++) {
-    const h = Math.pow(rx - ry, 2) / Math.pow(rx + ry, 2);
-    const C = Math.PI * (rx + ry) * (1 + (3 * h) / (10 + Math.sqrt(4 - 3 * h)));
-    const centreOk = rx - maxDim / 2 > minRadius && ry - maxDim / 2 > minRadius;
-    if (C >= totalArc && centreOk) break;
-    ry *= 1.04;
-    rx = ry * aspectRatio;
-  }
-
-  // Build arc-length lookup table (start at top of oval)
-  const N = 4000;
-  const table = [];
-  let arc = 0,
-    px,
-    py;
-  for (let i = 0; i <= N; i++) {
-    const t = -Math.PI / 2 + (i / N) * Math.PI * 2;
-    const x = rx * Math.cos(t);
-    const y = ry * Math.sin(t);
-    if (i > 0) arc += Math.hypot(x - px, y - py);
-    table.push({ arcLen: arc, x, y });
-    px = x;
-    py = y;
-  }
-
-  const C = table[table.length - 1].arcLen;
-  const totalWidth = rects.reduce((s, d) => s + d.width, 0);
-  const scale = (C - gap * rects.length) / totalWidth;
-
-  // Sample a point at a given arc length
-  function sampleAtArc(target) {
-    const arc = ((target % C) + C) % C;
-    let lo = 0,
-      hi = table.length - 1;
-    while (lo < hi - 1) {
-      const mid = (lo + hi) >> 1;
-      table[mid].arcLen < arc ? (lo = mid) : (hi = mid);
-    }
-    const a = table[lo],
-      b = table[hi];
-    const f =
-      b.arcLen === a.arcLen ? 0 : (arc - a.arcLen) / (b.arcLen - a.arcLen);
-    return { x: a.x + f * (b.x - a.x), y: a.y + f * (b.y - a.y) };
-  }
-
-  // Place each rect — returned x,y are centre coordinates relative to oval centre (0,0)
-  // Add your own cx/cy offset when rendering
-  let cursor = 0;
-  return rects.reduce((acc, d) => {
-    const pt = sampleAtArc(cursor + (d.width * scale) / 2);
-    cursor += d.width * scale + gap;
-    acc[d.id] = { x: pt.x, y: pt.y };
-    return acc;
-  },{});
 }
