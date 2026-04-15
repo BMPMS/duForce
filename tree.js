@@ -133,7 +133,7 @@ const changeChartViewType = (svg, selectedNodeNamesCopy,event) => {
   d3.selectAll("#search-input").property("value","");
 
 
-      d3.select("#collapsibleMenuToggle")
+  d3.select("#collapsibleMenuToggle")
     .style("display",currentLayout === "parameter" ? "block" : "none");
   config.setShortestPathString("");
   config.setGraphDataType(currentLayout);
@@ -154,10 +154,13 @@ const changeChartViewType = (svg, selectedNodeNamesCopy,event) => {
   svg.selectAll(".selectedCheckboxIconPath")
     .attr("d", (d) => getSelectedPath(d.data.type === "tier3" ? [d.data.NAME] : config.tier1And2Mapper[d.data.id]))
   if(currentLayout === "parameter"){
-    if(config.clickedMMVariable !== ""){
-      config.setNearestNeighbourOrigin(config.clickedMMVariable);
-      config.setMMClickedVariable("");
-    }
+    //if(config.clickedMMVariable !== ""){
+    //  config.setNearestNeighbourOrigin(config.clickedMMVariable);
+    //  config.setMMClickedVariable("");
+    //}
+  }
+  if(currentLayout === "parameter"){
+    config.setDefaultNodePositions(config.defaultNodePositions);
   }
   setTimeout(() => {
     renderGraph(config.graphDataType !== "parameter", false, config.nearestNeighbourOrigin !== "");

@@ -24,8 +24,8 @@ const generateParameterData = (dataNodes, dataLinks) => {
   const targetIdVar = "Variable";
   // filtering out duplicate links and set direction to both if opposite
   const links = dataLinks.reduce((acc, link) =>  {
-    link.source = link[sourceIdVar].replace(/ /g, "_");
-    link.target = link[targetIdVar].replace(/ /g, "_");
+    link.source = link[sourceIdVar];
+    link.target = link[targetIdVar];
     link.direction = "out";
     // PRECAUTIONARY ACTION: REMOVE DUPLICATE LINKS and set direction
     if(!acc.some((s) => s.source === link.source && s.target === link.target)){
@@ -350,12 +350,14 @@ const handleUrlInputs = () => {
           if(urlType.includes("NN") && config.parameterData.nodes.some((s) => s.id === parameter1)){
             // NN - only applies if parameter is valid
             // set origin + degree - depending on NND/NNV set currentLayout
-            config.setNearestNeighbourOrigin(parameter1);
             config.setNearestNeighbourDegree(+parameter2);
             config.setCurrentLayout(urlType === "NND" ? "default" : "nearestNeighbour");
             if(urlType === "NNV"){
               // additional config needed to change layout to NN after loading
               config.setNNUrlView(true);
+              config.setNearestNeighbourOrigin(parameter1);
+            } else {
+              config.setMMClickedVariable(parameter1);
             }
             // change type => parameter and check input
             config.setGraphDataType("parameter");
@@ -430,6 +432,7 @@ async function getConvertedData () {
     const nodePositions = await response2.json();
     if(useDefaults){
       config.setDefaultNodePositions(nodePositions);
+      config.setStoredDefaultNodePositions(nodePositions);
     }
 
     const convertedData = await response1.json();
@@ -520,9 +523,9 @@ async function getData() {
       }
       config.setSelectedNodeNames(selectedNodeNames);
 
+
       // as previously, chart always renders with full dataset (stored here);
       config.setParameterData(generateParameterData(resultNodesTrunc,resultEdges));
-
       // get hierarchy from node names
       const treeData = getHierarchy(resultNodesTrunc);
       // mapping submodules and segments to their child nodes (for tree selection)
@@ -557,7 +560,7 @@ async function getData() {
 if(!config.initialLoadComplete){
    getConvertedData();
 
-     // getData();
+   // getData();
 
   // Instructions to upload new data
 

@@ -33,6 +33,7 @@ export const config = {
   tier1And2Mapper: {},// used when collapsing/expanding tree
   // set after initial default load
   defaultNodePositions:{},
+  storedDefaultNodePositions: {},
   // arrays used for selected nodes (notDefault for NN + SP layouts)
   selectedNodeNames: [],
   notDefaultSelectedNodeNames: [],
@@ -43,7 +44,7 @@ export const config = {
   visibleVariableLinks:[],
   // config constants testing variables
   showParameters: false,
-  clickedMMVariable: "",
+  clickedMMVariable: "", //used when a tier3 variable is chosen in MM view AND as a placeholder when URL or 'from MM' has an NN value in default view - cleared at the right moment
   setVisibleVariableLinks(newArray) {
     if (typeof newArray === "object") {
       this.visibleVariableLinks = newArray;
@@ -160,6 +161,13 @@ export const config = {
     }
   },
   setDefaultNodePositions(newObject) {
+    if (typeof newObject === "object") {
+      this.defaultNodePositions = newObject;
+    } else {
+      console.error("Expected an object for defaultNodePositions.");
+    }
+  },
+  setStoredDefaultNodePositions(newObject) {
     if (typeof newObject === "object") {
       this.defaultNodePositions = newObject;
     } else {
