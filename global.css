@@ -524,7 +524,7 @@ input[type="range"] {
 #downloadNNData {
     cursor: pointer;
     position: absolute;
-    left: 6.2rem;
+    left: 1rem;
     top: 0.1rem;
     display: none;
     font-size: 0.7rem;
@@ -654,7 +654,7 @@ input[type="range"] {
     position: fixed;
     text-align: center;
     color: white;
-    left: 0.8rem;
+    left: 1.6rem;
     top: 0px;
 
 }

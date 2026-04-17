@@ -17,6 +17,7 @@ export const config = {
   shortestPathStart: "",
   shortestPathEnd: "",
   shortestPathString: "",
+  shortestPathTotalsString:"",
   showSingleNodes: false,
   // graph data set on initial load
   allNodeNames: [],
@@ -69,6 +70,13 @@ export const config = {
   setShortestPathString(newString) {
     if (typeof newString === "string") {
       this.shortestPathString = newString;
+    } else {
+      console.error("Expected a string for shortestPathString.");
+    }
+  },
+  setShortestPathTotalsString(newString) {
+    if (typeof newString === "string") {
+      this.shortestPathTotalsString = newString;
     } else {
       console.error("Expected a string for shortestPathString.");
     }

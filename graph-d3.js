@@ -840,7 +840,6 @@ export default async function ForceGraph(
     config.setNotDefaultSelectedNodeNames([]);
     config.setNotDefaultSelectedLinks([]);
     // search for connections between the two nodes
-    const connectedNodes = dijkstra.bidirectional(graph, config.shortestPathStart, config.shortestPathEnd);
     const allPaths = allShortestPaths(graph,config.shortestPathStart,config.shortestPathEnd);
     let pathLength = 0;
     const allNodes = [];
@@ -910,6 +909,8 @@ export default async function ForceGraph(
       config.setNotDefaultSelectedLinks(connectedLinks);
       config.setNotDefaultSelectedNodeNames(connectedChartNodes);
       config.setShortestPathString(`Shortest Path: ${config.shortestPathStart} -> ${config.shortestPathEnd}`)
+
+      config.setShortestPathTotalsString(allNodes.length === 0 ? '' : `${allPaths[0].length} steps + ${allPaths.length} paths`)
       const spUrl = `${windowBaseUrl}?SP=${getUrlId(config.shortestPathStart)}:${getUrlId(config.shortestPathEnd)}`;
       history.replaceState(null, '', spUrl);
       d3.select("#infoMessage").text("");
@@ -919,6 +920,7 @@ export default async function ForceGraph(
       config.setNotDefaultSelectedLinks([]);
       config.setNotDefaultSelectedNodeNames([]);
       config.setShortestPathString("");
+      config.setShortestPathTotalsString("");
       history.replaceState(null, '', windowBaseUrl);
     }
     resetMenuVisibility();
@@ -957,10 +959,12 @@ export default async function ForceGraph(
       resetMenuVisibility();
       if(config.shortestPathStart !== "" && config.shortestPathEnd !== ""){
         config.setShortestPathString("");
+        config.setShortestPathTotalsString("");
         positionShortestPath(graph);
       }
     } else if (config.currentLayout === "default" ) {
       config.setShortestPathString("");
+      config.setShortestPathTotalsString("");
       // whether from search box or node name
       // required behaviour is NN degree 1
       config.setNearestNeighbourOrigin(nodeName);
@@ -1884,8 +1888,10 @@ export default async function ForceGraph(
     if(config.currentLayout === "default" && expandedAll && !mouseover) tooltipVisibility = "hidden";
     if(mouseover) tooltipVisibility = "visible";
 
+    const tooltipCountSPExtra = config.currentLayout === "shortestPath" && config.graphDataType === "parameter" && config.shortestPathTotalsString !== "" ?
+      ` - ${config.shortestPathTotalsString}` : "";
     d3.select("#tooltipCount")
-      .text(tooltipVisibility === "visible" && !mouseover? `${listToShow.length} node${listToShow.length > 1 ? "s" : ""} selected` : "")
+      .text(tooltipVisibility === "visible" && !mouseover? `${listToShow.length} node${listToShow.length > 1 ? "s" : ""} selected ${tooltipCountSPExtra}` : "")
     if(config.currentLayout === "nearestNeighbour" && !mouseover) tooltipVisibility = "hidden";
 
     tooltip
@@ -2046,6 +2052,7 @@ export default async function ForceGraph(
       if(config.currentLayout === "nearestNeighbour"){
         updateViewButton(true);
         config.setShortestPathString("");
+        config.setShortestPathTotalsString("");
         d3.select("#infoMessage").text(MESSAGES.NN);
         config.setShortestPathStart("");
         config.setShortestPathEnd("");
@@ -2061,6 +2068,7 @@ export default async function ForceGraph(
       if(config.currentLayout === "shortestPath"){
         updateViewButton(true);
         config.setShortestPathString("");
+        config.setShortestPathTotalsString("");
         if(config.nearestNeighbourOrigin !== ""){
           config.setShortestPathStart(config.nearestNeighbourOrigin)
         }
@@ -2114,6 +2122,7 @@ export default async function ForceGraph(
           if(config.currentLayout === "default"){
             d3.select(".animation-container").style("display", "flex");
             config.setShortestPathString("");
+            config.setShortestPathTotalsString("");
             expandedAll = true;
             performZoomAction(showEle.nodes,400,"zoomFit");
             d3.select(event.currentTarget).style("display","none");
