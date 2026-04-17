@@ -17,20 +17,21 @@ import {
 } from "./constants";
 import { dijkstra } from "graphology-shortest-path";
 
-let zoom = d3.zoom();
+let zoom = undefined;
 let showEle;
 let expandedAll = true;
 
 const getLinkPath = (d) => {
-  // custom path to account for source + target radii so arrows will be visible
-  const path = d3.select(`#arrowLinkPath${d.index}`).node();
-  if(path){
-    const totalLength = path.getTotalLength();
-    const start = path.getPointAtLength(d.source.radius + 2);
-    const end = path.getPointAtLength(totalLength - (d.target.radius + 2));
-    return `M${start.x},${start.y},L${end.x},${end.y}`
-  }
-  return "";
+  // Create a temporary SVG path in memory
+  const tempPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
+  // Construct a straight line between source and target
+  tempPath.setAttribute("d", `M${d.source.x},${d.source.y}L${d.target.x},${d.target.y}`);
+
+  const totalLength = tempPath.getTotalLength();
+  const start = tempPath.getPointAtLength(d.source.radius + 2);
+  const end = tempPath.getPointAtLength(totalLength - (d.target.radius + 2));
+
+  return `M${start.x},${start.y}L${end.x},${end.y}`;
 }
 
 const drawChartLinks = (svg, chartLinks) => {
@@ -55,24 +56,15 @@ const drawChartLinks = (svg, chartLinks) => {
   // append chartLinks to linksGroup and define attributes
   const linksGroup = svg.select(".linkGroup")
     .selectAll(".linksGroup")
-    .data(chartLinks)
+    .data(chartLinks, (d) => `${CSS.escape(d.source.id)}-${CSS.escape(d.target.id)}-${config.graphDataType}`)
     .join((group) => {
       const enter = group.append("g").attr("class", "linksGroup");
-      enter.append("path").attr("class", "allLinkPaths linkPathForArrows");
       enter.append("path").attr("class", "allLinkPaths linkPath");
       return enter;
     });
 
-  // standard link which to create custom path in getLinkPath
-  linksGroup
-    .select(".linkPathForArrows")
-    .style("display","block")
-    .attr("opacity",1)
-    .attr("id", (d) => `arrowLinkPath${d.index}`)
-    .attr("pointer-events", "none")
-    .attr("stroke", "transparent")
-    .attr("fill","none")
-    .attr("d", (d) => `M${d.source.x},${d.source.y},L${d.target.x},${d.target.y}`)
+  const highlightPath = config.graphDataType === "parameter" && config.nearestNeighbourOrigin !== ""
+  && config.currentLayout === "default" ? "Highlight" : "";
 
   // visible link
   linksGroup
@@ -83,16 +75,13 @@ const drawChartLinks = (svg, chartLinks) => {
     .attr("stroke-opacity", (d) => getLinkAlpha(d,chartLinks.length))
     .attr("stroke-width", config.graphDataType === "parameter" ? 1.25 : 1.25)
     .attr("stroke", LINK_COLOR)
-    .attr("fill","none");
-
-  const highlightPath = config.graphDataType === "parameter" && config.nearestNeighbourOrigin !== ""
-  && config.currentLayout === "default" ? "Highlight" : "";
-
-  // adding arrows after link and standard link are rendered
-  svg.selectAll(".linkPath")
+    .attr("fill","none")
     .attr("d", getLinkPath)
     .attr("marker-start",(d) => checkLinkSelected(d) &&  d.direction === "both"  ? `url(#arrowPathStart${highlightPath})` : "")
     .attr("marker-end",(d) => checkLinkSelected(d)  ? `url(#arrowPathEnd${highlightPath})` : "")
+
+
+  // adding arrows after link and standard link are rendered
 
 }
 const getZoomCalculations = (currentNodes) => {
@@ -214,7 +203,6 @@ export default async function ForceGraph(
 
   } = {}
 ) {
-  debugger;
 
   expandedAll = config.graphDataType !== "parameter" || config.selectedNodeNames.length === (config.showParameters ? config.totalNodeCount : config.noParameterNodeCount);
   if(nearestNeighbour){
@@ -427,7 +415,8 @@ export default async function ForceGraph(
     return `${LABEL_FONT_BASE_REM}rem`
   }
 
-   zoom.on("zoom", (event) => {
+   zoom = d3.zoom()
+     .on("zoom", (event) => {
       const { x, y, k } = event.transform;
       currentZoomLevel = k;
       svg.attr("transform", `translate(${x},${y}) scale(${k})`);
@@ -437,6 +426,7 @@ export default async function ForceGraph(
     });
 
   baseSvg.call(zoom).on("dblclick.zoom", null);
+
 
   const performZoomAction  =  (
     currentNodes,
@@ -804,51 +794,123 @@ export default async function ForceGraph(
     }
   }
 
+  function allShortestPaths(graph, start, end) {
+    const dist = new Map();
+    const predecessors = new Map();
+    const pq = [[0, start]];
+
+    graph.forEachNode(node => {
+      dist.set(node, Infinity);
+      predecessors.set(node, new Set());
+    });
+    dist.set(start, 0);
+
+    while (pq.length > 0) {
+      pq.sort((a, b) => a[0] - b[0]);
+      const [d, u] = pq.shift();
+
+      if (d > dist.get(u)) continue;
+
+      graph.forEachOutNeighbor(u, (v, attr) => {
+        const newDist = dist.get(u) + (attr.weight ?? 1);
+
+        if (newDist < dist.get(v)) {
+          dist.set(v, newDist);
+          predecessors.set(v, new Set([u]));
+          pq.push([newDist, v]);
+        } else if (newDist === dist.get(v)) {
+          predecessors.get(v).add(u);
+        }
+      });
+    }
+
+    // Reconstruct all paths by walking predecessors back from end
+    function reconstruct(node) {
+      if (node === start) return [[start]];
+      return [...predecessors.get(node)]
+        .flatMap(pred => reconstruct(pred).map(path => [...path, node]));
+    }
+
+    return reconstruct(end);
+  }
+
   // shortest path functions
   function positionShortestPath (graph) {
     // clear data
     config.setNotDefaultSelectedNodeNames([]);
     config.setNotDefaultSelectedLinks([]);
     // search for connections between the two nodes
-    const connectedNodes = dijkstra.bidirectional(graph, config.shortestPathStart, config.shortestPathEnd);
-    if(connectedNodes){
+    const allPaths = allShortestPaths(graph,config.shortestPathStart,config.shortestPathEnd);
+    let pathLength = 0;
+    const allNodes = [];
+    if(allPaths.length > 0){
       // if results build the links
-      const connectedLinks = connectedNodes.reduce((acc, node,index) => {
-        if(index > 0){
-          const previousConnection = connectedNodes[index - 1];
-          const matchingLink = showEle.links.find((f) => getSourceId(f) === previousConnection && getTargetId(f) === node);
-          if(matchingLink){
-            acc.push({
-              source:previousConnection,
-              target: node,
-              node: previousConnection,
-              depth: 1,
-              direction:"outbound"
-            })
+      const connectedLinks = allPaths.reduce((acc, pathNodes) => {
+        pathLength = pathNodes.length; // paths should all be the same length
+        pathNodes.forEach((nodeId, index) => {
+          const position = index === 0 ? "start" : index === pathLength - 1 ?"end" :"middle";
+          if(!allNodes.some((s) => s.nodeId === nodeId)){
+            allNodes.push({nodeId,position, positionIndex: index});
           }
-        }
+          if(index > 0){
+            const previousConnection = pathNodes[index - 1];
+            const matchingLink = showEle.links.find((f) => getSourceId(f) === previousConnection && getTargetId(f) === nodeId);
+            if(matchingLink){
+              acc.push({
+                source:previousConnection,
+                target: nodeId,
+                node: previousConnection,
+                depth: 1,
+                direction:"outbound"
+              })
+            }
+          }
+        })
         return acc;
       },[])
       // now build the nodes
       let nodeGap = NODE_RADIUS_RANGE[1] * 6;
-      const nodeStart = -(connectedNodes.length * nodeGap)/2
-      const connectedChartNodes = connectedNodes.reduce((acc, node, index) => {
-        const matchingNode = showEle.nodes.find((f) => f.NAME === node);
+      const nodeStart = -(pathLength * nodeGap)/2;
+
+      const connectedChartNodes = allNodes.reduce((acc, node, index) => {
+        const matchingNode = showEle.nodes.find((f) => f.NAME === node.nodeId);
         if(index === 0){
           nodeGap -= matchingNode.radius
         }
-        acc.push({
+        const newNode = {
           name: matchingNode.id,
-          x: nodeStart + (nodeGap * index),
-          y: 0,
-          direction: "out"
-        });
+          id: matchingNode.id,
+          fx: nodeStart + (nodeGap * node.positionIndex),
+          direction: "out",
+          radius: matchingNode.radius
+        };
+        if(node.position !== "middle"){
+          newNode.fy = 0;
+        }
+        acc.push(newNode);
       return acc
       },[]);
+
+      const ySimulation = d3.forceSimulation()
+        .alphaDecay(0.1)
+        .force('link',d3.forceLink().id((d) => d.id))
+        .force('x', d3.forceX((d) => d.fx).strength(0.3))
+        .force('y', d3.forceY(0).strength(0.6))
+        .force('collide', d3.forceCollide().radius(nodeGap/4).strength(0.6));
+
+      ySimulation.stop();
+      ySimulation.nodes(connectedChartNodes);
+      ySimulation.force('link').links(connectedLinks)
+      ySimulation.tick(300);
+      ySimulation.stop();
+
+
       // set the data
       config.setNotDefaultSelectedLinks(connectedLinks);
       config.setNotDefaultSelectedNodeNames(connectedChartNodes);
       config.setShortestPathString(`Shortest Path: ${config.shortestPathStart} -> ${config.shortestPathEnd}`)
+
+      config.setShortestPathTotalsString(allNodes.length === 0 ? '' : `${allPaths[0].length} steps + ${allPaths.length} paths`)
       const spUrl = `${windowBaseUrl}?SP=${getUrlId(config.shortestPathStart)}:${getUrlId(config.shortestPathEnd)}`;
       history.replaceState(null, '', spUrl);
       d3.select("#infoMessage").text("");
@@ -858,6 +920,7 @@ export default async function ForceGraph(
       config.setNotDefaultSelectedLinks([]);
       config.setNotDefaultSelectedNodeNames([]);
       config.setShortestPathString("");
+      config.setShortestPathTotalsString("");
       history.replaceState(null, '', windowBaseUrl);
     }
     resetMenuVisibility();
@@ -896,10 +959,12 @@ export default async function ForceGraph(
       resetMenuVisibility();
       if(config.shortestPathStart !== "" && config.shortestPathEnd !== ""){
         config.setShortestPathString("");
+        config.setShortestPathTotalsString("");
         positionShortestPath(graph);
       }
     } else if (config.currentLayout === "default" ) {
       config.setShortestPathString("");
+      config.setShortestPathTotalsString("");
       // whether from search box or node name
       // required behaviour is NN degree 1
       config.setNearestNeighbourOrigin(nodeName);
@@ -1033,6 +1098,7 @@ export default async function ForceGraph(
 
   // Update coordinates of all nodes + links based on current config settings
   function updatePositions(zoomToBounds, fromNearestNeighbourDefaultNodeClick, afterDrag) {
+
     // redraw tree if needed
     if(config.graphDataType === "parameter" && config.currentLayout === "default"){
       drawTree();
@@ -1105,6 +1171,9 @@ export default async function ForceGraph(
         .some((s) => s.source === getSourceId(f) && s.target === getTargetId(f)));
       simulation.nodes(chartNodes).force("link").links(chartLinks);
       simulation.alphaTarget(1).restart();
+    } else if (config.graphDataType === "parameter" && config.currentLayout === "shortestPath" && config.notDefaultSelectedLinks.length > 0){
+      console.log('working')
+      chartLinks = config.notDefaultSelectedLinks;
     } else if (chartNodes.length !== (config.showParameters ? config.totalNodeCount : config.noParameterNodeCount)){
        chartLinks = showEle.links.filter((f) =>
          chartNodes.some((s) => s.NAME === getSourceId(f)) &&
@@ -1226,7 +1295,6 @@ export default async function ForceGraph(
       } else {
         const clickedNode = showEle.nodes.find((f) => f.id === config.clickedMMVariable);
         clickedNode.clicked = true;
-        console.log('adding value')
         d3.select(`#search-input`).property("value", config.clickedMMVariable);
 
       }
@@ -1262,21 +1330,23 @@ export default async function ForceGraph(
       // reset node data
       // filter and position nodes
       svg.selectAll(".nodesGroup")
-        .filter((f) => f.id === node.id)
-        .attr("transform",  `translate(${event.x},${event.y})`);
+        .attr("transform",  (d) => {
+          if(d.id === node.id) return `translate(${event.x},${event.y})`
+          return  `translate(${d.fx | d.x},${d.fy | d.y})`;
+        });
 
       // reset link data
-     svg.selectAll(".linksGroup")
-        .filter((f) => f.source.id === node.id || f.target.id === node.id)
-        .each((d,i,objects) => {
-          const source = d.source.id === node.id ? {x: event.x, y: event.y} : d.source;
-          const target = d.source.id === node.id ?   d.target : {x: event.x, y: event.y};
-          const linkObject = d3.select(objects[i]);
-          linkObject.select(".linkPathForArrows")
-            .attr("d",  `M${source.x},${source.y},L${target.x},${target.y}`);
-          linkObject.select(".linkPath")
-            .attr("d", getLinkPath)
+     svg.selectAll(".linkPath")
+        .each((d) => {
+          if(d.source.id === node.id){
+            d.source.x = event.x;
+            d.source.y = event.y;
+          } else if(d.target.id === node.id) {
+            d.target.x = event.x;
+            d.target.y = event.y;
+          }
         })
+       .attr("d", getLinkPath)
     }
 
     const dragended = (event, node) => {
@@ -1289,6 +1359,8 @@ export default async function ForceGraph(
         config.setDefaultNodePositions(newPositions)
       }
     }
+
+
 
     function macroOrMesoHighlight  (d)  {
       // highlight adjoining links and nodes when in config.graphDataType === "submodule" (Macro) or "segment" (meso)
@@ -1376,7 +1448,7 @@ export default async function ForceGraph(
      // append chartNodes to nodesGroup and define attributes
     const nodesGroup = svg.select(".nodeGroup")
       .selectAll(".nodesGroup")
-      .data(chartNodes, (d) => d.id)
+      .data(chartNodes, (d) => d.id + config.graphDataType)
       .join((group) => {
         const enter = group.append("g").attr("class", "nodesGroup");
         enter.append("circle").attr("class", "nodeOpacityCircle nodeBackgroundCircle");
@@ -1549,8 +1621,7 @@ export default async function ForceGraph(
       .attr("stroke", "white")
       .attr("stroke-width", getNodeStrokeWidth)
 
-    svg.selectAll(".nodesGroup")
-      .call(d3.drag()
+    nodesGroup.call(d3.drag()
         .on("drag", dragged)
         .on("end",dragended));
 
@@ -1606,7 +1677,9 @@ export default async function ForceGraph(
       updateTooltip(tooltipNode, false);
     }
 
-    if(expandedAll && config.graphDataType ==="parameter" && config.nearestNeighbourOrigin !== ""){
+    if(expandedAll && config.graphDataType ==="parameter" && config.clickedMMVariable !== ""){
+      config.setNearestNeighbourOrigin(config.clickedMMVariable);
+      config.setMMClickedVariable("");
       // default mode by valid NN - simulate clickNode
       clickNode(config.nearestNeighbourOrigin,"node",graph);
     }
@@ -1744,7 +1817,8 @@ export default async function ForceGraph(
       listToShow.forEach((d) => {
         let directionUnicode = "";
         if(d.direction && d.direction !== "centre"){
-          directionUnicode = d.direction === "in" ? ` (&larr;)` : ` (&rarr;)`
+          directionUnicode = d.direction === "in" ? ` (&larr;)` :
+            d.direction === "both" ? ` (&harr;)` : ` (&rarr;)`
         }
         const nodeName = typeof  d === "string" ? d : d.name;
         const matchingNode = showEle.nodes.find((f) => f.NAME === nodeName);
@@ -1785,6 +1859,7 @@ export default async function ForceGraph(
     // repeating declaration for tree NN
     expandedAll = config.selectedNodeNames.length === (config.showParameters ? config.totalNodeCount : config.noParameterNodeCount);
     if(mouseover){
+      d3.select("#downloadNNData").style("display","none");
       config.setTooltipRadio("none");
       tooltip.style("padding","0.4rem");
       let content = [];
@@ -1813,8 +1888,10 @@ export default async function ForceGraph(
     if(config.currentLayout === "default" && expandedAll && !mouseover) tooltipVisibility = "hidden";
     if(mouseover) tooltipVisibility = "visible";
 
+    const tooltipCountSPExtra = config.currentLayout === "shortestPath" && config.graphDataType === "parameter" && config.shortestPathTotalsString !== "" ?
+      ` - ${config.shortestPathTotalsString}` : "";
     d3.select("#tooltipCount")
-      .text(tooltipVisibility === "visible" && !mouseover? `${listToShow.length} node${listToShow.length > 1 ? "s" : ""} selected` : "")
+      .text(tooltipVisibility === "visible" && !mouseover? `${listToShow.length} node${listToShow.length > 1 ? "s" : ""} selected ${tooltipCountSPExtra}` : "")
     if(config.currentLayout === "nearestNeighbour" && !mouseover) tooltipVisibility = "hidden";
 
     tooltip
@@ -1905,6 +1982,8 @@ export default async function ForceGraph(
         tooltipExtra.style("visibility","hidden");
       })
 
+    d3.select("#downloadNNData").style("display",config.notDefaultSelectedLinks.length > 0 ? "block": "none");
+
   }
   //////////////////////////////////////////////////////////////////////////////
 
@@ -1973,6 +2052,7 @@ export default async function ForceGraph(
       if(config.currentLayout === "nearestNeighbour"){
         updateViewButton(true);
         config.setShortestPathString("");
+        config.setShortestPathTotalsString("");
         d3.select("#infoMessage").text(MESSAGES.NN);
         config.setShortestPathStart("");
         config.setShortestPathEnd("");
@@ -1988,6 +2068,7 @@ export default async function ForceGraph(
       if(config.currentLayout === "shortestPath"){
         updateViewButton(true);
         config.setShortestPathString("");
+        config.setShortestPathTotalsString("");
         if(config.nearestNeighbourOrigin !== ""){
           config.setShortestPathStart(config.nearestNeighbourOrigin)
         }
@@ -2041,6 +2122,7 @@ export default async function ForceGraph(
           if(config.currentLayout === "default"){
             d3.select(".animation-container").style("display", "flex");
             config.setShortestPathString("");
+            config.setShortestPathTotalsString("");
             expandedAll = true;
             performZoomAction(showEle.nodes,400,"zoomFit");
             d3.select(event.currentTarget).style("display","none");
@@ -2074,6 +2156,7 @@ export default async function ForceGraph(
             d3.select("#search-input-sp-end").property("value","");
             d3.select("#infoMessage").text(MESSAGES.SP);
             config.setNotDefaultSelectedNodeNames([]);
+            config.setNotDefaultSelectedLinks([]);
             updatePositions(false,false);
           }
         } else {

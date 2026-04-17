@@ -18,14 +18,11 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@pixi-essentials/cull": "^2.0.0",
     "d3": "^7.8.5",
     "fuse.js": "^7.1.0",
     "graphology": "^0.25.4",
     "graphology-shortest-path": "^2.0.2",
-    "graphology-traversal": "^0.3.1",
-    "pixi-viewport": "^5.0.1",
-    "pixi.js": "^7.2.4"
+    "graphology-traversal": "^0.3.1"
   },
   "devDependencies": {
     "cors": "^2.8.5",
