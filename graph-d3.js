@@ -23,15 +23,28 @@ let expandedAll = true;
 
 const getLinkPath = (d) => {
   // Create a temporary SVG path in memory
-  const tempPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
+  //const tempPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
   // Construct a straight line between source and target
-  tempPath.setAttribute("d", `M${d.source.x},${d.source.y}L${d.target.x},${d.target.y}`);
+  //tempPath.setAttribute("d", `M${d.source.x},${d.source.y}L${d.target.x},${d.target.y}`);
 
-  const totalLength = tempPath.getTotalLength();
-  const start = tempPath.getPointAtLength(d.source.radius + 2);
-  const end = tempPath.getPointAtLength(totalLength - (d.target.radius + 2));
+ // const totalLength = tempPath.getTotalLength();
+ // const start = tempPath.getPointAtLength(d.source.radius + 2);
+ // const end = tempPath.getPointAtLength(totalLength - (d.target.radius + 2));
 
-  return `M${start.x},${start.y}L${end.x},${end.y}`;
+  const dx = d.target.x - d.source.x;
+  const dy = d.target.y - d.source.y;
+  const length = Math.sqrt(dx * dx + dy * dy);
+
+  const offsetSource = (d.source.radius + 2) / length;
+  const offsetTarget = (d.target.radius + 2) / length;
+
+  const startX = d.source.x + dx * offsetSource;
+  const startY = d.source.y + dy * offsetSource;
+  const endX = d.target.x - dx * offsetTarget;
+  const endY = d.target.y - dy * offsetTarget;
+
+  return `M${startX},${startY}L${endX},${endY}`;
+  //return `M${start.x},${start.y}L${end.x},${end.y}`;
 }
 
 const drawChartLinks = (svg, chartLinks) => {
@@ -276,8 +289,6 @@ export default async function ForceGraph(
 
 
   const getSubModulePositions = () => {
-
-
     const submoduleLeaves = config.hierarchyData.subModuleNodes.map((m) =>  ({name: m.id || m.data?.id,value: d3.sum(m.leaves(), (s) => s.data.linkCount)}));
     const leafHierarchy = d3.hierarchy({name: 'root', children: submoduleLeaves})
       .sum((s) => s.value);
@@ -443,6 +454,7 @@ export default async function ForceGraph(
     }
   };
   const resetDefaultNodes = () => {
+    simulation.stop();
     // uses positions recorded from initial default build to reset the positions
     const previousPositions = config.defaultNodePositions;
     showEle.nodes.map((m) => {
@@ -454,6 +466,7 @@ export default async function ForceGraph(
         m.y = previousNode.y;
       }
     })
+
 
     simulation.nodes(showEle.nodes).force("link").links(showEle.links);
     simulation.alphaTarget(0.1).restart();
@@ -492,7 +505,6 @@ export default async function ForceGraph(
   if (!initial &&  config.graphDataType === "parameter" && Object.keys(config.defaultNodePositions).length > 0) {
     // not initial load OR positioning currently saved
     // for default, reset positions and re-run the simulation
-    resetDefaultNodes();
     updatePositions(true);
 
   } else {
@@ -635,7 +647,6 @@ export default async function ForceGraph(
 
     // duplicating here for call from tree.
     const svg = d3.select(".chartGroup");
-    const baseSvg = d3.select(".baseSvg");
 
     // reset links and nodes
     config.setNotDefaultSelectedLinks([]);
@@ -777,22 +788,13 @@ export default async function ForceGraph(
     const nnUrl = `${windowBaseUrl}?${config.currentLayout === "default" ? "NND" :"NNV"}=${getUrlId(config.nearestNeighbourOrigin)}:${config.nearestNeighbourDegree}`;
     history.replaceState(null, '', nnUrl);
     resetMenuVisibility();
-    if(config.currentLayout === "default" ){
-      resetNodeHighlight()
-      svg.selectAll(".nodeBackgroundCircle")
-        .classed("pulseNN", (d) =>  config.nearestNeighbourOrigin === d.id)
-      const nnChartLinks = showEle.links.filter((f) => config.notDefaultSelectedLinks
-        .some((s) => s.source === getSourceId(f) && s.target === getTargetId(f)))
-      drawChartLinks(svg, nnChartLinks);
-      zoomToFit(baseSvg,showEle.nodes.filter((f) => config.selectedNodeNames.includes(f.NAME)),300)
-      const currentNode = showEle.nodes.find((f) => f.id === config.nearestNeighbourOrigin)
-      updateTooltip(currentNode,false);
+    if(config.currentLayout === "default" ) {
       d3.select(".animation-container").style("display", "none");
-      svg.selectAll(".nodeLabel").style("display", getNodeLabelDisplay);
-    } else {
-      updatePositions(true,nodeClick);
     }
-  }
+    setTimeout(() => {
+      updatePositions(true,config.currentLayout === "default" ? false : nodeClick);
+    }, 0); // or 16 for ~1 frame delay at 60fps
+    }
 
   function allShortestPaths(graph, start, end) {
     const dist = new Map();
@@ -874,7 +876,7 @@ export default async function ForceGraph(
 
       const connectedChartNodes = allNodes.reduce((acc, node, index) => {
         const matchingNode = showEle.nodes.find((f) => f.NAME === node.nodeId);
-        if(index === 0){
+        if(index === 0) {
           nodeGap -= matchingNode.radius
         }
         const newNode = {
@@ -1101,6 +1103,7 @@ export default async function ForceGraph(
 
     // redraw tree if needed
     if(config.graphDataType === "parameter" && config.currentLayout === "default"){
+      resetDefaultNodes();
       drawTree();
     }
     // function used on node mouseover to populate tooltip + @ end of updatePositions
@@ -1172,7 +1175,9 @@ export default async function ForceGraph(
       simulation.nodes(chartNodes).force("link").links(chartLinks);
       simulation.alphaTarget(1).restart();
     } else if (config.graphDataType === "parameter" && config.currentLayout === "shortestPath" && config.notDefaultSelectedLinks.length > 0){
-      console.log('working')
+      if(config.shortestPathStart === "" || config.shortestPathEnd === ""){
+        config.setNotDefaultSelectedLinks([]);
+      }
       chartLinks = config.notDefaultSelectedLinks;
     } else if (chartNodes.length !== (config.showParameters ? config.totalNodeCount : config.noParameterNodeCount)){
        chartLinks = showEle.links.filter((f) =>
@@ -2027,13 +2032,15 @@ export default async function ForceGraph(
     if(!(config.currentLayout === "default" && config.nearestNeighbourOrigin !== "")){
       // clear url unless moving to default from NN with a current NN
       history.replaceState(null, '', windowBaseUrl);
+    } else {
+      const newUrl = window.location.href.replace(/NNV/g, 'NND');
+      history.replaceState(null, '',newUrl);
     }
     if(config.currentLayout === "default"){
       let fromValidNN = false;
       if(config.nearestNeighbourOrigin !== ""){
         fromValidNN = true;
-        config.setSelectedNodeNames(config.showParameters ? config.allNodeNames : config.noParameterAllNodeNames)
-       } else if(config.shortestPathStart === "" || config.shortestPathEnd === ""){
+      } else if(config.shortestPathStart === "" || config.shortestPathEnd === ""){
         config.setSelectedNodeNames([]);
       }
       config.setShortestPathStart("");
@@ -2045,9 +2052,10 @@ export default async function ForceGraph(
         config.setNotDefaultSelectedNodeNames([]);
         config.setNotDefaultSelectedLinks([]);
       }
-      resetDefaultNodes();
       resetMenuVisibility();
-      updatePositions(true,fromValidNN);
+      setTimeout(() => {
+        updatePositions(true,fromValidNN);
+      },0)
     } else {
       if(config.currentLayout === "nearestNeighbour"){
         updateViewButton(true);
@@ -2139,7 +2147,6 @@ export default async function ForceGraph(
               resetMenuVisibility();
               drawTree();
               resetNodeHighlight();
-              resetDefaultNodes();
               updatePositions(true)
               drawChartLinks(svg, config.visibleVariableLinks);
             }, 0); // or 16 for ~1 frame delay at 60fps
