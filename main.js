@@ -223,6 +223,9 @@ const setHierarchyData = (nodesCopy, resultEdges,parameterOnlyHierarchy) => {
   // remember we've switched externalLinks so all source ids are the current submodule/segment
   const getMMLinks = (linkVar, externalLinks, currentId) => externalLinks.reduce((acc, link) => {
     const matchingTarget = config.parameterData.nodes.find((s) => s.id === link.target);
+    if(!matchingTarget){
+      debugger;
+    }
     const target = matchingTarget[linkVar];
     const matchingLink = acc.find((s) => s.source === currentId && s.target === target)
     if(matchingLink) {
@@ -498,7 +501,7 @@ async function getData() {
     }
 
     const resultNodes = await response1.json();
-    const resultEdges = await response2.json();
+    let resultEdges = await response2.json();
     const parameters = new Set();
     if (resultNodes && resultEdges) {
       let resultNodesTrunc = resultNodes.map((d) => {
@@ -514,6 +517,13 @@ async function getData() {
           "Parameter Explanation": d["Parameter Explanation"]
         };
       });
+      resultEdges = resultEdges.reduce((acc, entry) => {
+        acc.push({
+          UsesVariable: entry.UsesVariable.replace(/ /g, "_"),
+          Variable: entry.Variable.replace(/ /g, "_")
+        })
+        return acc;
+      },[])
       resultNodesTrunc = dataNullValueCheck(resultNodesTrunc,"SUBMODULE");
       resultNodesTrunc = dataNullValueCheck(resultNodesTrunc,"SEGMENT");
       // selected node names stored in global array (default all selected)
@@ -560,7 +570,7 @@ async function getData() {
 if(!config.initialLoadComplete){
    getConvertedData();
 
-   // getData();
+    // getData();
 
   // Instructions to upload new data
 
