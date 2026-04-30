@@ -489,6 +489,8 @@ export default async function ForceGraph(
           const nodeNames = filteredListToShow.map((m) => m.name).concat(config.nearestNeighbourOrigin);
           svg.selectAll(".nodeOpacityCircle")
             .attr("opacity", (d) =>  nodeNames.includes(d.NAME) ? 1 : 0.2);
+          svg.selectAll(".nodeLabel")
+            .style("display", (d) => nodeNames.includes(d.NAME) ? 'block': 'none')
           svg.selectAll(".allLinkPaths")
           .attr("opacity",(f) => nodeNames.includes(f.source.NAME)  && nodeNames.includes(f.target.NAME) ? 1 : 0)
         } else {
@@ -704,6 +706,12 @@ export default async function ForceGraph(
     const maxOutDepth = d3.max(outboundHierarchy, (d) => d.depth);
     const shiftRight = (config.nearestNeighbourDegree + 0.5) * nnWidth;
 
+    const getDirection = (node, direction) => {
+      const matchingLink = direction === 'in' ? showEle.links.find((f) => getSourceId(f) === node.id && getTargetId(f) === node.parent.id)
+        : showEle.links.find((f) => getTargetId(f) === node.id && getSourceId(f) === node.parent.id)
+      if(matchingLink && matchingLink.direction === "both") return "multi";
+      return direction;
+    }
     // use new data and tree definition to build the data
     const getAllNodePositions = () => {
       const centralNodes = [{
@@ -719,7 +727,7 @@ export default async function ForceGraph(
           name: node.id,
           x: -node.y + shiftRight,
           y: node.x,
-          direction: "in",
+          direction: getDirection(node, "in"),
           depth: node.depth,
           nnLinkIds: getNNLinks(node)
         });
@@ -730,7 +738,7 @@ export default async function ForceGraph(
           name: node.id,
           x: node.y + shiftRight,
           y: node.x,
-          direction: "out",
+          direction: getDirection(node, "out"),
           depth: node.depth,
           nnLinkIds: getNNLinks(node)
         });
@@ -1154,6 +1162,11 @@ export default async function ForceGraph(
       } else if (config.tooltipRadio === "in"){
         const filteredNodeNames = config.notDefaultSelectedNodeNames
           .filter((f) => f.direction === "in" || f.direction === "center")
+          .map((m) => m.name);
+        config.setSelectedNodeNames(filteredNodeNames);
+      } else if (config.tooltipRadio === "multi"){
+        const filteredNodeNames = config.notDefaultSelectedNodeNames
+          .filter((f) => f.direction === "multi")
           .map((m) => m.name);
         config.setSelectedNodeNames(filteredNodeNames);
       } else {
@@ -1790,9 +1803,10 @@ export default async function ForceGraph(
 
       content = [`<div class="tooltipTableContents" style="white-space: nowrap; text-overflow: ellipsis; background-color :${nnNode.color}">${nnNode.NAME.toUpperCase()}${nnNode["DISPLAY_NAME"] ? " - " : ""}${nnNode["DISPLAY_NAME"] || ""}</div>
             <div id="directionToggle">
-             <label><input type="radio" class="directionToggle" name="directionToggle" value="both" ${config.tooltipRadio === "both" ? "checked" : ""}>both</label>
+             <label><input type="radio" class="directionToggle" name="directionToggle" value="both" ${config.tooltipRadio === "both" || config.tooltipRadio === "none"? "checked" : ""}>all</label>
              <label><input type="radio" class="directionToggle" name="directionToggle" value="in" ${config.tooltipRadio === "in" ? "checked" : ""}>only &larr;</label>
              <label><input type="radio" class="directionToggle" name="directionToggle" value="out" ${config.tooltipRadio === "out" ? "checked" : ""}>only &rarr;</label>
+             <label><input type="radio" class="directionToggle" name="directionToggle" value="multi" ${config.tooltipRadio === "multi" ? "checked" : ""}>both ↔</label>
            </div>`]
       listToShow = listToShow.filter((f) => f.name !== config.nearestNeighbourOrigin);
     } else if(config.shortestPathString !== ""){
@@ -1823,7 +1837,7 @@ export default async function ForceGraph(
         let directionUnicode = "";
         if(d.direction && d.direction !== "centre"){
           directionUnicode = d.direction === "in" ? ` (&larr;)` :
-            d.direction === "both" ? ` (&harr;)` : ` (&rarr;)`
+            d.direction === "multi" ? ` (&harr;)` : ` (&rarr;)`
         }
         const nodeName = typeof  d === "string" ? d : d.name;
         const matchingNode = showEle.nodes.find((f) => f.NAME === nodeName);
