@@ -733,6 +733,7 @@ export default async function ForceGraph(
         });
         return acc;
       }, []);
+
       const outboundNodes = getNNTree(outboundHierarchy,nnWidth * maxOutDepth).reduce((acc, node) => {
         acc.push({
           name: node.id,
@@ -1635,7 +1636,7 @@ export default async function ForceGraph(
     nodesGroup
       .select(".nodeCircle")
       .attr("r", (d) => d.radius)
-      .attr("fill", (d) =>  d.color)
+      .attr("fill",  (d) => d.color)
       .attr("stroke", "white")
       .attr("stroke-width", getNodeStrokeWidth)
 
@@ -1911,7 +1912,6 @@ export default async function ForceGraph(
       ` - ${config.shortestPathTotalsString}` : "";
     d3.select("#tooltipCount")
       .text(tooltipVisibility === "visible" && !mouseover? `${listToShow.length} node${listToShow.length > 1 ? "s" : ""} selected ${tooltipCountSPExtra}` : "")
-    if(config.currentLayout === "nearestNeighbour" && !mouseover) tooltipVisibility = "hidden";
 
     tooltip
       .html(`${contentStr}`)
