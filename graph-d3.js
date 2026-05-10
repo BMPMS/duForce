@@ -396,7 +396,7 @@ export default async function ForceGraph(
   const getNodeLabelDisplay = (d) => {
     expandedAll = config.selectedNodeNames.length === (config.showParameters ? config.totalNodeCount : config.noParameterNodeCount);
     if(config.graphDataType !== "parameter") return "block";
-    if(config.nearestNeighbourOrigin !== "" && config.currentLayout === "nearestNeighbour" && config.notDefaultSelectedNodeNames.some((s) => s.name === d.name)) return "block"
+   // if(config.nearestNeighbourOrigin !== "" && config.currentLayout === "nearestNeighbour" && config.notDefaultSelectedNodeNames.some((s) => s.name === d.name)) return "block"
     if(config.nearestNeighbourOrigin !== "" && config.selectedNodeNames.includes(d.NAME)) return "block";
     if(config.currentLayout === "shortestPath") return "block";
     if(!expandedAll && config.currentLayout === "default" && config.selectedNodeNames.includes(d.NAME)) return "block"
@@ -493,6 +493,7 @@ export default async function ForceGraph(
             .style("display", (d) => nodeNames.includes(d.NAME) ? 'block': 'none')
           svg.selectAll(".allLinkPaths")
           .attr("opacity",(f) => nodeNames.includes(f.source.NAME)  && nodeNames.includes(f.target.NAME) ? 1 : 0)
+          config.setSelectedNodeNames(nodeNames);
         } else {
           svg.selectAll(".allLinkPaths")
             .attr("opacity",1);
@@ -807,6 +808,7 @@ export default async function ForceGraph(
     config.setNotDefaultSelectedNodeNames(allNNNodes);
     if(config.currentLayout === "default"){
       // if from default view, set's selectedNodeNames
+      debugger;
       config.setSelectedNodeNames(allNNNodes.map((m) => m.name));
     }
     // duplicating here for from tree call
@@ -996,6 +998,7 @@ export default async function ForceGraph(
       // whether from search box or node name
       // required behaviour is NN degree 1
       config.setNearestNeighbourOrigin(nodeName);
+      debugger;
       config.setSelectedNodeNames([]);
       d3.select("#search-input").property("value",nodeName)
       positionNearestNeighbours(true);
@@ -1191,21 +1194,25 @@ export default async function ForceGraph(
       // for NN searches (default + nearestNeighbour layout) radio appears @ top of tooltip
       // apply filters if needed
       if(config.tooltipRadio === "both"){
+        debugger;
         config.setSelectedNodeNames(config.notDefaultSelectedNodeNames.map((m) => m.name));
       } else if (config.tooltipRadio === "in"){
         const filteredNodeNames = config.notDefaultSelectedNodeNames
           .filter((f) => f.direction === "in" || f.direction === "center")
           .map((m) => m.name);
+        debugger;
         config.setSelectedNodeNames(filteredNodeNames);
       } else if (config.tooltipRadio === "multi"){
         const filteredNodeNames = config.notDefaultSelectedNodeNames
           .filter((f) => f.direction === "multi")
           .map((m) => m.name);
+        debugger;
         config.setSelectedNodeNames(filteredNodeNames);
       } else {
         const filteredNodeNames = config.notDefaultSelectedNodeNames
           .filter((f) => f.direction === "out" || f.direction === "center")
           .map((m) => m.name);
+        debugger;
         config.setSelectedNodeNames(filteredNodeNames);
       }
     }
@@ -1942,7 +1949,7 @@ export default async function ForceGraph(
     expandedAll = config.selectedNodeNames.length === (config.showParameters ? config.totalNodeCount : config.noParameterNodeCount);
     if(mouseover){
       d3.select("#downloadNNData").style("display","none");
-      config.setTooltipRadio("none");
+      // config.setTooltipRadio("none");
       tooltip.style("padding","0.4rem");
       let content = [];
       if(!d || !d.NAME) return;
@@ -2117,6 +2124,7 @@ export default async function ForceGraph(
       if(config.nearestNeighbourOrigin !== ""){
         fromValidNN = true;
       } else if(config.shortestPathStart === "" || config.shortestPathEnd === ""){
+        debugger;
         config.setSelectedNodeNames([]);
       }
       config.setShortestPathStart("");
