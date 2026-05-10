@@ -396,6 +396,7 @@ export default async function ForceGraph(
   const getNodeLabelDisplay = (d) => {
     expandedAll = config.selectedNodeNames.length === (config.showParameters ? config.totalNodeCount : config.noParameterNodeCount);
     if(config.graphDataType !== "parameter") return "block";
+    if(config.nearestNeighbourOrigin !== "" && config.currentLayout === "nearestNeighbour" && config.notDefaultSelectedNodeNames.some((s) => s.name === d.name)) return "block"
     if(config.nearestNeighbourOrigin !== "" && config.selectedNodeNames.includes(d.NAME)) return "block";
     if(config.currentLayout === "shortestPath") return "block";
     if(!expandedAll && config.currentLayout === "default" && config.selectedNodeNames.includes(d.NAME)) return "block"
@@ -466,7 +467,6 @@ export default async function ForceGraph(
         m.y = previousNode.y;
       }
     })
-
 
     simulation.nodes(showEle.nodes).force("link").links(showEle.links);
     simulation.alphaTarget(0.1).restart();
@@ -670,7 +670,7 @@ export default async function ForceGraph(
 
     // using d3.tree() to build the positions for inbound and outbound nodes
     // so first step is to build the data for these 2 trees
-    const radiusMultiple = 2.4;
+    const radiusMultiple = 3;
     const inboundRootLink = [{ target: "", source: config.nearestNeighbourOrigin }];
     const inboundHierarchy = getNNHierarchy("target","source","inbound",inboundRootLink);
 
@@ -726,7 +726,9 @@ export default async function ForceGraph(
         acc.push({
           name: node.id,
           x: -node.y + shiftRight,
+          oppositeX: node.y + shiftRight,
           y: node.x,
+          column: `in-${node.depth}`,
           direction: getDirection(node, "in"),
           depth: node.depth,
           nnLinkIds: getNNLinks(node)
@@ -738,16 +740,31 @@ export default async function ForceGraph(
         acc.push({
           name: node.id,
           x: node.y + shiftRight,
+          oppositeX: -node.y + shiftRight,
           y: node.x,
           direction: getDirection(node, "out"),
+          column: `out-${node.depth}`,
           depth: node.depth,
           nnLinkIds: getNNLinks(node)
         });
         return acc;
       }, []);
+
       const allNodes = centralNodes.concat(inboundNodes).concat(outboundNodes);
+      const multiNodes = allNodes.filter((f) => f.direction === "multi");
+      multiNodes.forEach((node) => {
+        allNodes.push({
+          name: `${node.name}_multi`,
+          x: node.oppositeX,
+          y: node.y,
+          direction: "multi",
+          column: node.column === `out-${node.depth}` ? `in-${node.depth}` : `out-${node.depth}`,
+          depth: node.depth,
+          nnLinkIds: node.nnLinkIds
+        })
+      })
       return allNodes.reduce((acc, node) => {
-        const matchingNode = showEle.nodes.find((f) => f.NAME === node.name);
+        const matchingNode = showEle.nodes.find((f) => node.name.includes(f.NAME));
          if(matchingNode){
            const filterParameter = !config.showParameters && matchingNode.isParameter;
            if(!filterParameter){
@@ -761,7 +778,7 @@ export default async function ForceGraph(
 
     // get node positions using the custom trees
     const allNNNodes = getAllNodePositions();
-    const nodesByColumn = Array.from(d3.group(allNNNodes, (g) => `${g.direction}-${g.depth}`));
+    const nodesByColumn = Array.from(d3.group(allNNNodes, (g) => g.column));
     // use generated trees to get the height and stack the nodes vertically
     const groupsWithHeightInRange = nodesByColumn.filter((f) => f[1].length > 1 && d3.sum(f[1], (s) => s.radius * radiusMultiple) < height);
     groupsWithHeightInRange.forEach((group) => {
@@ -1141,8 +1158,23 @@ export default async function ForceGraph(
       if(validNN || validSP){
         showEle.nodes.map((m) => m.direction = undefined);
         chartNodes = showEle.nodes.reduce((acc,node) => {
+          // due to both direction functionality in NN view there could be > 1 node with the same name
           const matchingNode = config.notDefaultSelectedNodeNames.find((f) => f.name === node.NAME);
-          if(matchingNode){
+          if(matchingNode) {
+            const multiMatching = config.notDefaultSelectedNodeNames.find((f) => f.name === `${node.NAME}_multi`);
+            if(multiMatching){
+              acc.push({
+                ...node,
+                NAME: multiMatching.name,
+                name: multiMatching.name,
+                id: multiMatching.name,
+                index: multiMatching.index,
+                x: multiMatching.x,
+                y: multiMatching.y,
+                nnLinkIds: multiMatching.nnLinkIds,
+                "Parameter Explanation": ""
+              });
+            }
             node.x = matchingNode.x;
             node.y = matchingNode.y;
             node.nnLinkIds = matchingNode.nnLinkIds;
@@ -1186,8 +1218,36 @@ export default async function ForceGraph(
     || (config.graphDataType === "parameter" && config.nearestNeighbourOrigin !== "")){
       chartLinks = showEle.links.filter((f) => config.notDefaultSelectedLinks
         .some((s) => s.source === getSourceId(f) && s.target === getTargetId(f)));
+      const multiNodes = chartNodes.filter((f) => f.name.includes("_multi"));
+      multiNodes.forEach((node) => {
+        const nodeId = node.name.replace(/_multi/g,'');
+        const multiLinks = chartLinks.filter((f) => getSourceId(f) === nodeId || getTargetId(f) === nodeId && f.direction !== "multi");
+        multiLinks.forEach((link) => {
+          let source = getSourceId(link);
+          let target = getTargetId(link);
+          if(source === nodeId){
+            source = node.name;
+          } else if (source !== config.nearestNeighbourOrigin) {
+            source = `${source}_multi`;
+          }
+          if (target === nodeId){
+            target = node.name;
+          } else if (target !== config.nearestNeighbourOrigin){
+            target = `${target}_multi`
+          }
+          if(chartNodes.some((s) => s.id === source) && chartNodes.some((s) => s.id === target)){
+            chartLinks.push({
+              source,
+              target,
+              direction: link.direction,
+              index: link.index
+            })
+          }
+        })
+      })
       simulation.nodes(chartNodes).force("link").links(chartLinks);
       simulation.alphaTarget(1).restart();
+      simulation.stop();
     } else if (config.graphDataType === "parameter" && config.currentLayout === "shortestPath" && config.notDefaultSelectedLinks.length > 0){
       if(config.shortestPathStart === "" || config.shortestPathEnd === ""){
         config.setNotDefaultSelectedLinks([]);
@@ -1478,6 +1538,9 @@ export default async function ForceGraph(
 
     nodesGroup
       .attr("opacity",1)
+      .call(d3.drag()
+        .on("drag", dragged)
+        .on("end",dragended))
       .attr("transform", (d) => `translate(${d.x},${d.y})`)
       .on("mouseover",(event,d) => {
         tooltip.style("visibility", "hidden");
@@ -1524,7 +1587,7 @@ export default async function ForceGraph(
       .on("mouseout", () => {
         expandedAll = config.selectedNodeNames.length === (config.showParameters ? config.totalNodeCount : config.noParameterNodeCount);
         d3.select(".tooltipExtra").style("visibility","hidden");
-          if(config.graphDataType === "parameter"){
+        if(config.graphDataType === "parameter"){
             allNodeMouseout();
           if(expandedAll && config.currentLayout === "default"){
             tooltip.style("visibility", "hidden");
@@ -1640,9 +1703,7 @@ export default async function ForceGraph(
       .attr("stroke", "white")
       .attr("stroke-width", getNodeStrokeWidth)
 
-    nodesGroup.call(d3.drag()
-        .on("drag", dragged)
-        .on("end",dragended));
+
 
     nodesGroup
       .select(".nodeLabel")
@@ -1685,6 +1746,7 @@ export default async function ForceGraph(
       if(!expandedAll && config.currentLayout === "default"){
         zoomNodes = zoomNodes.filter((f) => config.selectedNodeNames.includes(f.id));
       }
+
       performZoomAction(zoomNodes,initial ? 0 : 400,"zoomFit")
     }
 
@@ -2363,7 +2425,8 @@ export default async function ForceGraph(
       const nonExactMatches = result.filter(m => !m.item.NAME.startsWith(input))
        // .sort((a,b) => a.item.NAME.toLowerCase().localeCompare(b.item.NAME.toLowerCase()));
       // Combine exact matches with non-exact matches
-      const finalResults = [...exactMatches, ...nonExactMatches];
+      const finalResults = [...new Set([...exactMatches, ...nonExactMatches])];
+
       return finalResults.map((m) => m.item);
     }
 
