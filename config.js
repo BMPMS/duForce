@@ -44,7 +44,7 @@ export const config = {
   nnUrlView: false,
   visibleVariableLinks:[],
   // config constants testing variables
-  showParameters: false,
+  showParameters: true,
   clickedMMVariable: "", //used when a tier3 variable is chosen in MM view AND as a placeholder when URL or 'from MM' has an NN value in default view - cleared at the right moment
   setVisibleVariableLinks(newArray) {
     if (typeof newArray === "object") {
