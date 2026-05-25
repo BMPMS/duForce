@@ -15,12 +15,19 @@ import {
   LINK_FORCE_STRENGTH,
   LABEL_FONT_BASE_REM
 } from "./constants";
-import { dijkstra } from "graphology-shortest-path";
 
 let zoom = undefined;
 let showEle;
 let expandedAll = true;
 
+
+const  makeSafeId = (value) => {
+  return String(value)
+    .normalize("NFKD")              // normalize unicode
+    .replace(/[^\w\-]/g, "_")       // keep only A-Z a-z 0-9 _ -
+    .replace(/_+/g, "_")            // collapse repeats
+    .replace(/^_+|_+$/g, "");       // trim edges
+}
 const getLinkPath = (d) => {
   // Create a temporary SVG path in memory
   //const tempPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
@@ -69,7 +76,7 @@ const drawChartLinks = (svg, chartLinks) => {
   // append chartLinks to linksGroup and define attributes
   const linksGroup = svg.select(".linkGroup")
     .selectAll(".linksGroup")
-    .data(chartLinks, (d) => `${CSS.escape(d.source.id)}-${CSS.escape(d.target.id)}-${config.graphDataType}`)
+    .data(chartLinks, (d) => `${makeSafeId(d.source.id)}-${makeSafeId(d.target.id)}-${config.graphDataType}`)
     .join((group) => {
       const enter = group.append("g").attr("class", "linksGroup");
       enter.append("path").attr("class", "allLinkPaths linkPath");
@@ -153,7 +160,7 @@ const resetMenuVisibility = () => {
       .style("visibility", config.currentLayout === "default" ? "hidden" : "visible");
     // think about where to set the initial position to hidden on load...
     d3.select("#layout-button").style("display","block");
-    d3.select("#nnDegreeDiv").style("display",config.nearestNeighbourOrigin ? "block" : "none")
+    d3.select("#nnDegreeDiv").style("display",config.nearestNeighbourOrigin  && config.currentLayout === "default"? "block" : "none")
     if(config.currentLayout === "default"){
       const allNodeLength = config.showParameters ? config.totalNodeCount : config.noParameterNodeCount;
       d3.select("#unselectAll").style("display",menuVisible && allNodeLength > 0? "block" : "none");
@@ -397,7 +404,7 @@ export default async function ForceGraph(
     expandedAll = config.selectedNodeNames.length === (config.showParameters ? config.totalNodeCount : config.noParameterNodeCount);
     if(config.graphDataType !== "parameter") return "block";
    // if(config.nearestNeighbourOrigin !== "" && config.currentLayout === "nearestNeighbour" && config.notDefaultSelectedNodeNames.some((s) => s.name === d.name)) return "block"
-    if(config.nearestNeighbourOrigin !== "" && config.selectedNodeNames.includes(d.NAME)) return "block";
+    if(config.nearestNeighbourOrigin !== "" && config.selectedNodeNames.includes(d.NAME.replace(/_multi/g,''))) return "block";
     if(config.currentLayout === "shortestPath") return "block";
     if(!expandedAll && config.currentLayout === "default" && config.selectedNodeNames.includes(d.NAME)) return "block"
     return "none";
@@ -482,6 +489,7 @@ export default async function ForceGraph(
     d3.selectAll(".directionToggle")
       .on("change", (event) => {
         config.setTooltipRadio(event.currentTarget.value);
+        console.log(event.currentTarget.value)
         if(event.currentTarget.value !== "both"){
           const filteredListToShow = config.notDefaultSelectedNodeNames.filter((f) => f.direction === event.currentTarget.value);
           const tooltipContent = getTooltipTable(filteredListToShow,{});
@@ -495,9 +503,11 @@ export default async function ForceGraph(
           .attr("opacity",(f) => nodeNames.includes(f.source.NAME)  && nodeNames.includes(f.target.NAME) ? 1 : 0)
           config.setSelectedNodeNames(nodeNames);
         } else {
+          config.setSelectedNodeNames(config.notDefaultSelectedNodeNames.map((m) => m.name));
+          console.log(config.selectedNodeNames, config.notDefaultSelectedNodeNames)
           svg.selectAll(".allLinkPaths")
             .attr("opacity",1);
-          resetNodeHighlight();
+              resetNodeHighlight();
           const tooltipContent = getTooltipTable(config.notDefaultSelectedNodeNames,{});
           tooltip.html(`${tooltipContent.join("")}`)
         }
@@ -648,6 +658,7 @@ export default async function ForceGraph(
   }
   function positionNearestNeighbours(nodeClick) {
 
+    config.setTooltipRadio("none");
     // duplicating here for call from tree.
     const svg = d3.select(".chartGroup");
 
@@ -754,6 +765,14 @@ export default async function ForceGraph(
       const allNodes = centralNodes.concat(inboundNodes).concat(outboundNodes);
       const multiNodes = allNodes.filter((f) => f.direction === "multi");
       multiNodes.forEach((node) => {
+        const nnLinkIds = node.nnLinkIds.reduce((acc,entry) => {
+          if(entry === node.name){
+            acc.push(`${node.name}_multi`)
+          } else {
+            acc.push(entry)
+          }
+          return acc
+        },[])
         allNodes.push({
           name: `${node.name}_multi`,
           x: node.oppositeX,
@@ -761,7 +780,7 @@ export default async function ForceGraph(
           direction: "multi",
           column: node.column === `out-${node.depth}` ? `in-${node.depth}` : `out-${node.depth}`,
           depth: node.depth,
-          nnLinkIds: node.nnLinkIds
+          nnLinkIds
         })
       })
       return allNodes.reduce((acc, node) => {
@@ -808,7 +827,6 @@ export default async function ForceGraph(
     config.setNotDefaultSelectedNodeNames(allNNNodes);
     if(config.currentLayout === "default"){
       // if from default view, set's selectedNodeNames
-      debugger;
       config.setSelectedNodeNames(allNNNodes.map((m) => m.name));
     }
     // duplicating here for from tree call
@@ -998,7 +1016,6 @@ export default async function ForceGraph(
       // whether from search box or node name
       // required behaviour is NN degree 1
       config.setNearestNeighbourOrigin(nodeName);
-      debugger;
       config.setSelectedNodeNames([]);
       d3.select("#search-input").property("value",nodeName)
       positionNearestNeighbours(true);
@@ -1194,25 +1211,21 @@ export default async function ForceGraph(
       // for NN searches (default + nearestNeighbour layout) radio appears @ top of tooltip
       // apply filters if needed
       if(config.tooltipRadio === "both"){
-        debugger;
         config.setSelectedNodeNames(config.notDefaultSelectedNodeNames.map((m) => m.name));
       } else if (config.tooltipRadio === "in"){
         const filteredNodeNames = config.notDefaultSelectedNodeNames
           .filter((f) => f.direction === "in" || f.direction === "center")
           .map((m) => m.name);
-        debugger;
         config.setSelectedNodeNames(filteredNodeNames);
       } else if (config.tooltipRadio === "multi"){
         const filteredNodeNames = config.notDefaultSelectedNodeNames
           .filter((f) => f.direction === "multi")
           .map((m) => m.name);
-        debugger;
         config.setSelectedNodeNames(filteredNodeNames);
       } else {
         const filteredNodeNames = config.notDefaultSelectedNodeNames
           .filter((f) => f.direction === "out" || f.direction === "center")
           .map((m) => m.name);
-        debugger;
         config.setSelectedNodeNames(filteredNodeNames);
       }
     }
@@ -1612,8 +1625,12 @@ export default async function ForceGraph(
       .on("click", (event, d) => {
         if (event.defaultPrevented) return; // dragged
         // no click action in shortest path or nearest neighbour view
-        if(config.graphDataType === "parameter" && config.currentLayout !== "default") return;
-        if(config.currentLayout === "default" && config.graphDataType === "parameter"){
+        if(config.graphDataType === "parameter" && config.currentLayout === "shortestPath") return;
+        if(config.currentLayout === "nearestNeighbour" && config.graphDataType === "parameter" ) {
+          allNodeMouseout();
+          d3.select(`#search-input`).property("value","")
+          clickNode(d.NAME, `search`, graph);
+        } else if(config.currentLayout === "default"  && config.graphDataType === "parameter" ){
           allNodeMouseout();
           // default click (NN 1 search but staying in this layout)
           d3.select(event.currentTarget).raise();
@@ -1695,6 +1712,7 @@ export default async function ForceGraph(
       .attr("stroke-opacity", 0.7)
 
     svg.selectAll(".nodeBackgroundCircle")
+      .attr("id",(d) => `nodeBackground${makeSafeId(d.id)}`)
       .classed("pulseNN", (d) => config.nearestNeighbourOrigin === "" ? false : config.nearestNeighbourOrigin === d.id)
 
 
@@ -1711,7 +1729,6 @@ export default async function ForceGraph(
       .attr("stroke-width", getNodeStrokeWidth)
 
 
-
     nodesGroup
       .select(".nodeLabel")
       .attr("pointer-events","none")
@@ -1720,7 +1737,7 @@ export default async function ForceGraph(
       .attr("fill", "white")
       .attr("dy",getNodeLabelDy)
       .attr("font-size",getNodeLabelSize)
-      .text((d) => (d.NAME || d.data?.NAME || d.name));
+      .text((d) => String(d.NAME || d.data?.NAME || d.name).replace(/_multi/g,''));
 
     resetMenuVisibility();
 
@@ -1891,8 +1908,8 @@ export default async function ForceGraph(
         config.setTooltipRadio("none");
       }
       d3.select(".tooltip").style("padding","0.05rem")
-      const shortestPathHeader = config.nearestNeighbourOrigin === "" ? "" : `<th style='width:5%;'></th>`;
-      const nearestNeighbourHeader =  `<th style='width:5%;'></th>`;
+      const shortestPathHeader = config.nearestNeighbourOrigin === "" || config.currentLayout === "nearestNeighbour" ? "" : `<th style='width:5%;'></th>`;
+      const nearestNeighbourHeader =  config.currentLayout === "nearestNeighbour"  ? "" : `<th style='width:5%;'></th>`;
       const tableStart = `<table style='overflow-y: auto; overflow-x: hidden; font-size: 0.7rem; table-layout: fixed;  width: 100%;'>
         <thead><tr>
           ${config.graphDataType === "parameter" ? "<th style='width:30%; color: black;'>SEGMENT</th>" : ""}
@@ -1914,16 +1931,18 @@ export default async function ForceGraph(
         if(matchingNode){
           const directLink = config.notDefaultSelectedLinks.some((s) => (s.source === matchingNode.NAME && s.target === config.nearestNeighbourOrigin) || (s.target === matchingNode.NAME && s.source === config.nearestNeighbourOrigin));
           let shortestPathCell = "";
-          if(directLink){
+          if(config.currentLayout === "nearestNeighbour"){
+            shortestPathCell = "";
+          } else if(directLink){
             shortestPathCell = "<td class='tableCell'></td>"
           } else if (config.nearestNeighbourOrigin !== ""){
-            shortestPathCell =  `<td class='shortestPathLink tableCell' id='${CSS.escape(matchingNode.NAME)}' style='width:5%; cursor:pointer;'><i class='fas fa-wave-square'></i></td>`
+            shortestPathCell =  `<td class='shortestPathLink tableCell' id='${makeSafeId(matchingNode.NAME)}' style='width:5%; cursor:pointer;'><i class='fas fa-wave-square'></i></td>`
           }
-          const nearestNeighbourCell =  `<td class='nearestNeighbourLink' id='${CSS.escape(matchingNode.NAME)}' style='width:5%; cursor:pointer;'><i class='fas fa-house-user'></i></td>`
-          nodeRows.push({row: `<tr id="${CSS.escape(matchingNode.NAME)}">
+          const nearestNeighbourCell =  config.currentLayout === "nearestNeighbour" ? "" : `<td class='nearestNeighbourLink' id='${makeSafeId(matchingNode.NAME)}' style='width:5%; cursor:pointer;'><i class='fas fa-house-user'></i></td>`
+          nodeRows.push({row: `<tr id="${makeSafeId(matchingNode.NAME)}">
             ${config.graphDataType === "parameter" ? `<td  style='pointer-events: none; background-color:${matchingNode.color}; color: white; width:30%;'>${matchingNode.SEGMENT_NAME}</td>`: ""}
-            <td class="tableCell" id='${CSS.escape(matchingNode.NAME)}' style="width:35%;">${directionUnicode} ${nodeName}</td>
-            <td class="tableCell" id='${CSS.escape(matchingNode.NAME)}' style="width:35%;">${matchingNode["DISPLAY_NAME"] || ""}</td>
+            <td class="tableCell" id='${makeSafeId(matchingNode.NAME)}' style="width:35%;">${directionUnicode} ${nodeName}</td>
+            <td class="tableCell" id='${makeSafeId(matchingNode.NAME)}' style="width:35%;">${matchingNode["DISPLAY_NAME"] || ""}</td>
             ${shortestPathCell} ${nearestNeighbourCell}
             </tr>`, subModule: matchingNode.SUBMODULE_NAME, name: matchingNode.NAME}); // tooltip title
         }
@@ -1947,9 +1966,11 @@ export default async function ForceGraph(
     }
     // repeating declaration for tree NN
     expandedAll = config.selectedNodeNames.length === (config.showParameters ? config.totalNodeCount : config.noParameterNodeCount);
+    tooltip
+      .style("max-height",mouseover ? "none" : "10rem")
     if(mouseover){
       d3.select("#downloadNNData").style("display","none");
-      // config.setTooltipRadio("none");
+      config.setTooltipRadio("none");
       tooltip.style("padding","0.4rem");
       let content = [];
       if(!d || !d.NAME) return;
@@ -2025,7 +2046,7 @@ export default async function ForceGraph(
       })
       .on("click", (event) => {
         const rowId = event.currentTarget.id;
-        const matchingNode = showEle.nodes.find((f) => CSS.escape(f.NAME) === rowId);
+        const matchingNode = showEle.nodes.find((f) => makeSafeId(f.NAME) === rowId);
         tooltipExtra.style("visibility","hidden");
         config.setShortestPathStart("");
         config.setShortestPathEnd("")
@@ -2049,10 +2070,22 @@ export default async function ForceGraph(
         d3.selectAll(".tableCell").style("background-color","black");
         const rowId = event.currentTarget.id;
         if(!rowId)return;
-        const matchingNode = showEle.nodes.find((f) => CSS.escape(f.NAME) === rowId);
+        const matchingNode = showEle.nodes.find((f) => makeSafeId(f.NAME) === rowId);
 
-        d3.selectAll(`#${rowId}`)
-          .style("background-color","#484848");
+      d3.selectAll("td").style("opacity",0.6);
+        d3.selectAll(`tr#${rowId}`)
+          .selectAll("td")
+          .style("opacity",1)
+
+        svg.selectAll(".nodeBackgroundCircle").classed("pulseNN",false);
+        const nnId = makeSafeId(config.nearestNeighbourOrigin);
+        d3.select(`#nodeBackground${rowId}`)
+          .classed("pulseNN",true);
+
+        d3.select(`#nodeBackground${nnId}`)
+          .classed("pulseNN",true);
+
+
         let tooltipText = matchingNode["DISPLAY NAME"];
         if(!tooltipText || tooltipText.length === 0){
           tooltipText = rowId.replace(/\\/g, '');
@@ -2065,6 +2098,11 @@ export default async function ForceGraph(
         }
       })
       .on("mouseout", () => {
+        d3.selectAll(".nodeBackgroundCircle").classed("pulseNN",false);
+        const nnId = makeSafeId(config.nearestNeighbourOrigin);
+        d3.select(`#nodeBackground${nnId}`)
+          .classed("pulseNN",true);
+        d3.selectAll("td").style("opacity",1);
         d3.selectAll(".tableCell").style("background-color","black");
         d3.selectAll(".nearestNeighbourLink").style("background-color","black");
         tooltipExtra.style("visibility","hidden");
@@ -2124,7 +2162,6 @@ export default async function ForceGraph(
       if(config.nearestNeighbourOrigin !== ""){
         fromValidNN = true;
       } else if(config.shortestPathStart === "" || config.shortestPathEnd === ""){
-        debugger;
         config.setSelectedNodeNames([]);
       }
       config.setShortestPathStart("");
@@ -2472,7 +2509,6 @@ export default async function ForceGraph(
         suggestionsContainer.style.display = "block";
         if(config.graphDataType !== "parameter"){
           showEle.nodes.map((m) => m.clicked = false);
-          config.setShowSingleNodes(true);
           svg.selectAll(".nodesGroup").attr("opacity",1);
            updatePositions(true);
         }

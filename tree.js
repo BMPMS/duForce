@@ -1,5 +1,5 @@
 import * as d3 from "d3";
-import { COLOR_SCALE_RANGE, MESSAGES, useDefaults } from "./constants";
+import { COLOR_SCALE_RANGE,  useDefaults } from "./constants";
 import { config } from "./config";
 import {zoomToFit} from "./graph-d3";
 import ForceGraph from "./graph-d3";
@@ -30,7 +30,7 @@ const getGraphData = () => {
 export const getColorScale = () => d3.scaleOrdinal(config.hierarchyData.subModuleNames, COLOR_SCALE_RANGE);
 const colorScale = getColorScale();
 
-const getSubModuleColours = () =>  config.hierarchyData.subModuleNames.reduce((acc, entry,index) => {
+const getSubModuleColours = () =>  config.hierarchyData.subModuleNames.reduce((acc, entry) => {
   acc.push({
       name: entry,
       fill: colorScale(entry)
