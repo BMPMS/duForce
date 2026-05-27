@@ -117,8 +117,9 @@ const getZoomCalculations = (currentNodes) => {
   const screenHeight = window.innerHeight;
 
   const translateX = -(xExtent0 + xExtent1) / 2;
-  const translateY = -(yExtent0 + yExtent1) / 2 + (config.currentLayout === "nearestNeighbour" ? 30 : 0);
-  const fitToScale = 0.95 / Math.max(xWidth / screenWidth, yWidth / screenHeight);
+  const translateY = -(yExtent0 + yExtent1) / 2 + (config.currentLayout === "nearestNeighbour" ? 60 : 0);
+  const scale = config.currentLayout === "nearestNeighbour" ? 0.85 : 0.95;
+  const fitToScale = scale / Math.max(xWidth / screenWidth, yWidth / screenHeight);
   return {translateX, translateY, fitToScale};
 };
 
@@ -405,8 +406,14 @@ export default async function ForceGraph(
     if(config.graphDataType !== "parameter") return "block";
    // if(config.nearestNeighbourOrigin !== "" && config.currentLayout === "nearestNeighbour" && config.notDefaultSelectedNodeNames.some((s) => s.name === d.name)) return "block"
     if(config.nearestNeighbourOrigin !== "" && config.selectedNodeNames.includes(d.NAME.replace(/_multi/g,''))) return "block";
+    if(config.currentLayout === "nearestNeighbour"){
+      console.log('past 1')
+    }
     if(config.currentLayout === "shortestPath") return "block";
     if(!expandedAll && config.currentLayout === "default" && config.selectedNodeNames.includes(d.NAME)) return "block"
+    if(config.currentLayout === "nearestNeighbour"){
+      console.log('past 3', d.NAME, d.name)
+    }
     return "none";
   }
 
@@ -489,7 +496,6 @@ export default async function ForceGraph(
     d3.selectAll(".directionToggle")
       .on("change", (event) => {
         config.setTooltipRadio(event.currentTarget.value);
-        console.log(event.currentTarget.value)
         if(event.currentTarget.value !== "both"){
           const filteredListToShow = config.notDefaultSelectedNodeNames.filter((f) => f.direction === event.currentTarget.value);
           const tooltipContent = getTooltipTable(filteredListToShow,{});
@@ -504,7 +510,6 @@ export default async function ForceGraph(
           config.setSelectedNodeNames(nodeNames);
         } else {
           config.setSelectedNodeNames(config.notDefaultSelectedNodeNames.map((m) => m.name));
-          console.log(config.selectedNodeNames, config.notDefaultSelectedNodeNames)
           svg.selectAll(".allLinkPaths")
             .attr("opacity",1);
               resetNodeHighlight();
@@ -619,9 +624,10 @@ export default async function ForceGraph(
 
   function renderNNLevelLabels (svg,nnData,linkCount) {
 
+
     // render (or unrenders) the level titles
-    const nnWidth = 1500;
-    const nnHeight = Math.max(300,linkCount * 3);
+    const nnWidth = linkCount < 50 ? 150 : (linkCount < 100 ?300 : 500);
+    const nnHeight = Math.max(height,linkCount * 5);
 
     svg.selectAll(".nnLabelGroup")
       .attr("display","block");
@@ -800,12 +806,15 @@ export default async function ForceGraph(
     const allNNNodes = getAllNodePositions();
     const nodesByColumn = Array.from(d3.group(allNNNodes, (g) => g.column));
     // use generated trees to get the height and stack the nodes vertically
-    const groupsWithHeightInRange = nodesByColumn.filter((f) => f[1].length > 1 && d3.sum(f[1], (s) => s.radius * radiusMultiple) < height);
-    groupsWithHeightInRange.forEach((group) => {
+    const groupsWithHeightInRange = nodesByColumn.filter((f) => f[1].length > 0 && d3.sum(f[1], (s) => (s.radius * 2) + 12) < height);
+    console.log(groupsWithHeightInRange);
+    groupsWithHeightInRange.forEach((group,index) => {
       let currentY = 0;
       group[1].forEach((node) => {
-        node.y = currentY + node.radius;
-        currentY += (node.radius *radiusMultiple);
+        currentY += node.radius;
+        node.fy = currentY
+        node.fx = node.x;
+        currentY += (node.radius + 20);
       })
     })
 
@@ -820,7 +829,12 @@ export default async function ForceGraph(
       ySimulation.stop();
       ySimulation.nodes(allNNNodes);
       ySimulation.tick(300);
+      allNNNodes.forEach((node) => {
+        node.fy = undefined;
+        node.fx = undefined;
+      })
     }
+
 
     // set the links and nodes
     config.setNotDefaultSelectedLinks(nnLinks);
@@ -828,6 +842,8 @@ export default async function ForceGraph(
     if(config.currentLayout === "default"){
       // if from default view, set's selectedNodeNames
       config.setSelectedNodeNames(allNNNodes.map((m) => m.name));
+    } else {
+      config.setSelectedNodeNames(config.notDefaultSelectedNodeNames.map((m) => m.name));
     }
     // duplicating here for from tree call
     const windowBaseUrl = window.location.href.split("?")[0];
@@ -1629,7 +1645,8 @@ export default async function ForceGraph(
         if(config.currentLayout === "nearestNeighbour" && config.graphDataType === "parameter" ) {
           allNodeMouseout();
           d3.select(`#search-input`).property("value","")
-          clickNode(d.NAME, `search`, graph);
+          config.setTooltipRadio("both");
+          clickNode(d.NAME.replace(/_multi/g,''), `search`, graph);
         } else if(config.currentLayout === "default"  && config.graphDataType === "parameter" ){
           allNodeMouseout();
           // default click (NN 1 search but staying in this layout)
@@ -1974,12 +1991,12 @@ export default async function ForceGraph(
       tooltip.style("padding","0.4rem");
       let content = [];
       if(!d || !d.NAME) return;
-      content.push(`<div style="pointer-events: none; background-color: ${d.color || d.COLOR} "><p style='text-align: center' >${d.NAME}</p></div>`); // tooltip title
+      content.push(`<div style="pointer-events: none; background-color: ${d.color || d.COLOR} "><p style='text-align: center' >${d.NAME.replace(/_multi/g,'')}</p></div>`); // tooltip title
       const datum = showEle.nodes.find(node => node.NAME === d.NAME) || d;
 
       TOOLTIP_KEYS.forEach(key => {
         if(datum[key] && datum[key] !== ""){
-          content.push(`<div><b>${key.replace(/_/g, ' ')}: </b><span>${datum[key].replace(/_/g, ' ')}</span></div>`);
+          content.push(`<div><b>${key.replace(/_/g, ' ')}: </b><span>${datum[key].replace(/_/g, ' ').replace(/_multi/g,'')}</span></div>`);
         }
       })
       if(d["parameterCount"]){
