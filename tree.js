@@ -3,6 +3,7 @@ import { COLOR_SCALE_RANGE,  useDefaults } from "./constants";
 import { config } from "./config";
 import {zoomToFit} from "./graph-d3";
 import ForceGraph from "./graph-d3";
+import { getSubModuleColours } from "./scripts/layout-functions.mjs";
 
 const mainAppContainerSelector = "#app";
 export const resetNodeHighlight = () => {
@@ -30,18 +31,12 @@ const getGraphData = () => {
 export const getColorScale = () => d3.scaleOrdinal(config.hierarchyData.subModuleNames, COLOR_SCALE_RANGE);
 const colorScale = getColorScale();
 
-const getSubModuleColours = () =>  config.hierarchyData.subModuleNames.reduce((acc, entry) => {
-  acc.push({
-      name: entry,
-      fill: colorScale(entry)
-    })
-    return acc;
-  },[]);
+
 export const renderGraph = (initial, nearestNeighbour, nnViewChange = false ) => {
 
   const graphData = getGraphData();
 
- const subModuleColors = getSubModuleColours(window.innerWidth, window.innerHeight)
+ const subModuleColors = getSubModuleColours(config.hierarchyData.subModuleNames,colorScale)
   // Execute the function to generate a new network
   ForceGraph(
     graphData,

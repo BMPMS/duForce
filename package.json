@@ -4,6 +4,10 @@
   "homepage": "https://bmpms.github.io/duForce",
   "description": "",
   "scripts": {
+    "convert-data": "node scripts/convert-data.mjs",
+    "generate-layouts": "node scripts/generate-layouts.mjs",
+    "rebuild-data": "npm run convert-data && npm run generate-layouts",
+
     "dev": "vite",
     "build": "vite build  && node ./scripts/copy-assets.js",
     "preview": "vite preview",
