@@ -1,6 +1,17 @@
 # International Futures Network Diagram
 
-### Setup
+### Data Conversion
+
+1. move your new nodes.json + edges.json into the assets directory in the duForce root - it must be moved here, nowhere else
+2. open the terminal in the root
+3. type 'npm run rebuild-data' and wait - messages will appear in the terminal as the conversion progresses, should take about 10 mins
+
+That should be it.....
+
+
+
+
+### OLD INSTRUCTIONS
 
 1. Data
 Default position is working with current convertedData.json (see assets).
