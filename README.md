@@ -6,7 +6,7 @@
 2. open the terminal in the root
 3. type 'npm run rebuild-data' and wait - messages will appear in the terminal as the conversion progresses, should take about 10 mins
 
-
+That should be it.....
 
 
 
