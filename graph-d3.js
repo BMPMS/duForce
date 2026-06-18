@@ -3,6 +3,8 @@ import Graph from "graphology";
 import Fuse from 'fuse.js'
 import { config } from "./config";
 import { drawTree, getUrlId, remToPx, resetNodeHighlight } from "./tree";
+import {convertNodes,getSimulation} from "./scripts/layout-functions.mjs";
+
 import {
   LINK_ARROW_COLOR,
   LINK_COLOR,
@@ -244,26 +246,8 @@ export default async function ForceGraph(
       .domain(["tier1","tier2","tier3"])
       .range(MACRO_MESO_RADII);
 
-    // add additional node variables
-  showEle.nodes = showEle.nodes.reduce((acc, node) => {
-    if(!node.id){
-      node.id = node.data.id;
-      node.type = node.data.type;
-    }
-    const subModule = node.subModule ? node.subModule : node.data.subModule;
-    const matchingSubmodule = subModuleColors.find((f) => f.name === subModule);
-    if(!matchingSubmodule){
-      console.error('PROBLEM WITH MATCHING SUBMODULE - should not happen!!!!')
-    }
-    node.name = node.NAME || node.data?.NAME;
-    node.color = matchingSubmodule.fill;
-    node.radiusVar = config.graphDataType === "parameter" ? node.linkCount : node.type || node.data?.type;
-    node.radius = (node.isParameter || node.data?.isParameter && config.graphDataType === "parameter") ?  NODE_RADIUS_RANGE[0] : nodeRadiusScale(node.radiusVar);
-    node.group = node.subModule || node.data.subModule;
-    acc.push(node);
-    return acc;
-  }, [])
-
+  // add additional node variables
+  showEle.nodes = convertNodes(showEle.nodes,config.graphDataType, subModuleColors,NODE_RADIUS_RANGE, nodeRadiusScale);
 
   // select or define non data-appended elements
   let baseSvg = d3.select(containerSelector).select("svg");
@@ -291,50 +275,11 @@ export default async function ForceGraph(
   // graphology component (used for NN and SP)
   const graph = initGraphologyGraph(showEle.nodes, showEle.links);
 
-  const xWeight = width > height ? 0.7 : 1;
-  const yWeight = width > height ? 1 : 0.7;
 
 
 
-  const getSubModulePositions = () => {
-    const submoduleLeaves = config.hierarchyData.subModuleNodes.map((m) =>  ({name: m.id || m.data?.id,value: d3.sum(m.leaves(), (s) => s.data.linkCount)}));
-    const leafHierarchy = d3.hierarchy({name: 'root', children: submoduleLeaves})
-      .sum((s) => s.value);
-    const tree = d3.treemap()
-      .size([width,height]);
-    tree(leafHierarchy);
-    const submoduleRects = leafHierarchy.descendants()
-      .filter((f) => f.depth > 0)
-      .map((m) => ({x: m.x0 + (m.x1 - m.x0)/2, y: m.y0 + (m.y1 - m.y0)/2, id: m.data.name}));
 
-    return submoduleRects
-      .reduce((acc, entry) => {
-        acc[entry.id] = {x: entry.x, y: entry.y}
-        return acc;
-      },{});
-  }
-
-  const submodulePositions = getSubModulePositions();
-
-  const simulation = d3
-    .forceSimulation()
-    .force("charge", d3.forceManyBody().strength(config.graphDataType !== "parameter"  ? 0 : -300))
-    .force("link", d3.forceLink().id((d) => d.id).strength((link) => {
-      const isParameter = link.source.data?.isParameter || link.target.data?.isParameter;
-      if(config.graphDataType !== "parameter" || isParameter){
-        return 0
-      } // default from https://d3js.org/d3-force/link as distance doesn't matter here
-      // return 0
-      return LINK_FORCE_STRENGTH
-    }))
-    .force("x", d3.forceX((d) => config.graphDataType === "parameter" ? submodulePositions[d.subModule].x :width/2).strength( config.graphDataType !== "parameter"  ? xWeight * 0.04 : xWeight * 0.15))
-    .force("y", d3.forceY((d) => config.graphDataType === "parameter" ? submodulePositions[d.subModule].y :width/2).strength( config.graphDataType !== "parameter"  ? yWeight * 0.04 :yWeight * 0.15))
-    .force("collide", d3.forceCollide() // change segment when ready
-      .radius((d) => d.radius * (config.graphDataType === "parameter" ? RADIUS_COLLIDE_MULTIPLIER : 4))
-      .strength(1)
-      .iterations(30)
-    ) // change segment when ready
-    .force("cluster", forceCluster()) // cluster all nodes belonging to the same submodule.
+  const simulation = getSimulation(d3,config.graphDataType,LINK_FORCE_STRENGTH,RADIUS_COLLIDE_MULTIPLIER,config.hierarchyData.subModuleNodes,width,height);
 
   simulation.stop();
 
@@ -1841,64 +1786,7 @@ export default async function ForceGraph(
 
   }
   // simulation functions
-  function centroid(nodes) {
-    let x = 0;
-    let y = 0;
-    let z = 0;
-    for (const d of nodes) {
-      let k = d.radius ** 4;
-      x += d.x * k
-      y += d.y * k;
-      z += k;
-    }
-    return { x: x / z, y: y / z };
-  }
 
-
-  function forceCluster() {
-    //const strength =  config.graphDataType === "parameter" ? 0.3 : 0.6 ;
-    const strength = config.graphDataType === "parameter" ? 0.2 : 0.4
-    const parentStrength = 0.05;
-    let nodes;
-    function force(alpha) {
-
-       if(config.graphDataType === "parameter"){
-         const centroids = d3.rollup(nodes, centroid, (r) =>   r.subModule );
-         for (const d of nodes) {
-           const l = alpha * strength;
-           const { x: cx, y: cy } = centroids.get(d.subModule);
-           d.vx -= (d.x - cx) * l;
-           d.vy -= (d.y - cy) * l;
-         }
-       } else {
-         // Calculate centroids for each group
-         const groupCentroids = d3.rollup(nodes, centroid, (r) => r.group);
-
-         // Calculate centroids for each parent group
-         const parentCentroids = d3.rollup(nodes, centroid, (r) => r.subModule);
-
-         for (const d of nodes) {
-           const l = alpha * strength;
-           const pl = alpha * parentStrength;
-
-           // Force toward group centroid (strong)
-           const { x: cx, y: cy } = groupCentroids.get(d.group);
-           d.vx -= (d.x - cx) * l;
-           d.vy -= (d.y - cy) * l;
-
-           // Force toward parent group centroid (weak)
-           const { x: pcx, y: pcy } = parentCentroids.get(d.subModule);
-           d.vx -= (d.x - pcx) * pl;
-           d.vy -= (d.y - pcy) * pl;
-         }
-       }
-
-
-    }
-    force.initialize = (_) => (nodes = _);
-
-    return force;
-  }
 
   function getTooltipTable (listToShow) {
     let content = [];
@@ -2571,3 +2459,4 @@ function getSourceId(d) {
 function getTargetId(d) {
   return d.target && (d.target.id ? d.target.id : d.target);
 }
+

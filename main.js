@@ -4,18 +4,7 @@ import * as d3 from "d3";
 import { useDefaults } from "./constants";
 
 // functions used by getData in order - dataNullValueCheck, generateParameterData, getHierarchy, setHierarchyData
-const dataNullValueCheck = (nodeData, dataType) => {
-  // makes sure that there are matching nodes for segment and submodule names
-  nodeData.filter((f) => f[dataType] === null).map((m) => {
-    const matching = nodeData.find((f) => f[`${dataType}_NAME`] === m[`${dataType}_NAME`]);
-    if(matching){
-      m[dataType] = matching[dataType];
-    } else {
-      console.error(`${JSON.stringify(m)} has missing ${dataType} data`);
-    }
-  });
-  return nodeData.filter((f) => f[dataType] !== null);
-}
+
 
 const generateParameterData = (dataNodes, dataLinks) => {
   // building nodes and links here
@@ -144,183 +133,7 @@ const getHierarchy = (nodes) => {
     })
 }
 
-const setHierarchyData = (nodesCopy, resultEdges,parameterOnlyHierarchy) => {
-  const subModuleNames = new Set();
-  const segmentNames = new Set();
-  const mmLinks = [];
 
-  const getOppositeData = (leaves) => {
-    // set of parameters which belong to this submodule OR segment
-    const parameterSet = leaves.map((m) => m.data.id);
-    const variableOnly = leaves
-      .filter((f) => !f.data.isParameter)
-      .map((m) => m.data.id)
-    const linkCount = resultEdges
-      .filter((f) => variableOnly.includes(f.source) ||  variableOnly.includes(f.target))
-      .length;
-    // currently in the data all edge direction is OUT
-    const edgeDirection = [...new Set(resultEdges.map((m) => m.direction))]
-    if(edgeDirection.length !== 1){
-      // adding a check in case this changes
-      console.log('change in data, new direction added!!!')
-    }
-
-    // direction the same as out
-    const sourceLinks = resultEdges.filter((f) => parameterSet.includes(f.source) && !parameterSet.includes(f.target))
-      .reduce((acc, entry) => {
-        if(!acc.some((s) => s.target === entry.target && s.source === entry.source)){
-          acc.push({
-            source: entry.source,
-            target: entry.target,
-            direction: "out"
-          })
-        }
-        return acc;
-      },[])
-
-    // switching source + target as in
-    const targetLinks = resultEdges.filter((f) => !parameterSet.includes(f.source) && parameterSet.includes(f.target))
-      .reduce((acc, entry) => {
-        if(!acc.some((s) => s.source === entry.target && s.target === entry.source)){
-          // switching the direction!
-          const hasOpposite = sourceLinks.find((s) => s.target === entry.target && s.source === entry.source);
-          if(hasOpposite){
-            hasOpposite.direction = "both";
-          } else {
-            acc.push({
-              source: entry.target,
-              target: entry.source,
-              direction: "out"
-            })
-          }
-        }
-        return acc
-      },[])
-
-     // internalLinks = source + target in parameterSet
-     // parameter -> parameter therefore included in parameterData
-
-      return  {externalLinks: [
-        ...sourceLinks,
-        ...targetLinks],linkCount}
-  }
-
-  const addToAllLinks = (mmLinks, link) => {
-    const matchingLink = mmLinks.find((s) => s.source === link.source && s.target === link.target);
-    if(matchingLink){
-      if(matchingLink.direction !== link.direction){
-        matchingLink.direction = "both";
-      }
-    } else {
-      const oppositeLink = mmLinks.find((s) => s.source === link.target && s.target === link.source);
-      if(oppositeLink && (oppositeLink.direction === "both" || (oppositeLink.direction === "out" && link.direction === "out"))){
-        oppositeLink.direction = "both";
-      } else {
-        mmLinks.push(link);
-      }
-    }
-  }
-  // remember we've switched externalLinks so all source ids are the current submodule/segment
-  const getMMLinks = (linkVar, externalLinks, currentId) => externalLinks.reduce((acc, link) => {
-    const matchingTarget = config.parameterData.nodes.find((s) => s.id === link.target);
-    if(!matchingTarget){
-      debugger;
-    }
-    const target = matchingTarget[linkVar];
-    const matchingLink = acc.find((s) => s.source === currentId && s.target === target)
-    if(matchingLink) {
-      matchingLink.count += 1;
-      if(matchingLink.direction !== link.direction){
-        matchingLink.direction = "both";
-      }
-    } else {
-      if(currentId !== target){
-        acc.push({
-          source: currentId,
-          target: target,
-          direction: link.direction,
-          count: 1
-        })
-      }
-    }
-    return acc;
-    },[])
-
-  // add extra properties and populate submodule + segment sets
-  nodesCopy.descendants()
-    .map((m) => {
-      m.id = m.data.id;
-      m.type = `tier${m.depth}`;
-      m.group = m.data.id;
-      m.subModule = m.data.subModule;
-      m.isParameter = m.data.isParameter;
-      if(m.depth === 1){
-        m.data.parameterCount = m.leaves().length;
-        subModuleNames.add(m.data.id);
-        const { externalLinks,linkCount } = getOppositeData(m.leaves());
-
-        // subModule -> parameter and parameter -> subModule
-        const subModuleLinks = getMMLinks("subModule",externalLinks, m.data.id);
-        // subModule -> segment and segment -> subModule
-        const segmentLinks = getMMLinks("segment",externalLinks, m.data.id);
-        const parameterLinks = getMMLinks("id",externalLinks, m.data.id);
-        m.data.linkCount = linkCount;
-        subModuleLinks.forEach((link) => addToAllLinks(mmLinks,link));
-        segmentLinks.forEach((link) => addToAllLinks(mmLinks,link));
-        parameterLinks.forEach((link) => addToAllLinks(mmLinks,link));
-
-
-
-        // internal links covered by parameterData links
-      } else if(m.depth === 2){
-        m.data.parameterCount = m.children.length;
-        segmentNames.add(m.data.id);
-        const {externalLinks,linkCount } = getOppositeData(m.leaves());
-        // already covered subModule -> segment and segment -> subModule
-        // segment -> segment and segment -> segment
-        const segmentLinks = getMMLinks("segment",externalLinks, m.data.id);
-        const parameterLinks = getMMLinks("id",externalLinks, m.data.id);
-        m.data.linkCount = linkCount;
-        segmentLinks.forEach((link) => addToAllLinks(mmLinks,link));
-        parameterLinks.forEach((link) => addToAllLinks(mmLinks,link));
-        // already covered internal links within subModule
-      } else if (m.depth === 3){
-        m.data.parameterCount = 1;
-        const { linkCount } = getOppositeData(m.leaves());
-        m.data.linkCount = linkCount
-        // not storing any data, covered by parameterData links
-      }
-    })
-  const subModuleNodes = nodesCopy.descendants().filter((f) => f.depth === 1);
-  const segmentNodes = nodesCopy.descendants().filter((f) => f.depth === 2);
-  segmentNodes.map((m) => m.group = m.subModule);
-  const segmentSubmoduleMapper = {};
-  subModuleNodes.forEach((d) => segmentSubmoduleMapper[d.data.id] = d.data.NAME);
-  segmentNodes.forEach((d) => segmentSubmoduleMapper[d.data.id] = d.data.NAME);
-
-  config.setHierarchyData({
-    subModuleNodes,
-    segmentNodes,
-    mmLinks,
-    segmentNames: Array.from(segmentNames),
-    subModuleNames: Array.from(subModuleNames),
-    segmentSubmoduleMapper
-  })
-  function hierarchyToJSON(node) {
-    return {
-      ...node.data, // your original data fields
-      children: node.children?.map(hierarchyToJSON)
-    };
-  }
-
-  console.log({
-    'hierarchyData': hierarchyToJSON(subModuleNodes[0].parent),
-    'parameterData': config.parameterData,
-    'mmLinks': mmLinks,
-    'segmentSubmoduleMapper': segmentSubmoduleMapper
-  })
-
-}
 
 const handleUrlInputs = () => {
   // check if reload
@@ -486,7 +299,7 @@ async function getConvertedData () {
     console.error("Error fetching data:", error);
   }
 }
-async function getData() {
+export async function getData() {
   try {
     config.setInitialLoadComplete(true);
     console.log('call get data')
@@ -555,9 +368,10 @@ async function getData() {
       // copy hierarchy data
       const nodesCopy = treeData.copy();
       // set more config variables
-      setHierarchyData(nodesCopy, resultEdges);
+      const convertedData =  setHierarchyData(nodesCopy, resultEdges);
       // call the tree
-      VariableTree(treeData);
+      //VariableTree(treeData);
+      return convertedData;
     } else {
       throw new Error("Invalid response format");
     }
