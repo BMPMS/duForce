@@ -88,7 +88,7 @@ async function run() {
       const formattedData = await generatePositions(layout, subModuleNodes, convertedNodes, links,getSimulation);
       console.log(layout, 'format data ok')
       const outputPath = path.resolve(__dirname, `../assets/defaultNodePositions_${layout.name}.json`);
-      const backupPath = path.resolve(__dirname, `../assets/defaultNodePositions_${layout.name}-backup.json`);
+      const backupPath = path.resolve(__dirname, `../assets_backup/defaultNodePositions_${layout.name}-backup.json`);
       const tempPath = `${outputPath}.tmp`;
 
       const json = JSON.stringify(formattedData, null, 2);

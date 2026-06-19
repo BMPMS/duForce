@@ -405,7 +405,7 @@ async function run() {
 
     const backupPath = path.resolve(
       __dirname,
-      '../assets/convertedData-backup.json'
+      '../assets_backup/convertedData-backup.json'
     );
 
     const tempPath = `${outputPath}.tmp`;
