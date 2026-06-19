@@ -16,7 +16,7 @@ import {
   RADIUS_COLLIDE_MULTIPLIER,
   LINK_FORCE_STRENGTH,
   LABEL_FONT_BASE_REM
-} from "./constants";
+} from "./constants.mjs";
 
 let zoom = undefined;
 let showEle;

@@ -8,8 +8,8 @@ import { readFile } from "fs/promises";
 const d3 = await import('d3');
 
 const layouts = [
-  { name: 'horizontal', width: 1920, height: 1080 },
-  { name: 'vertical', width: 1080, height: 1920 },
+  { name: 'landscape', width: 1920, height: 1080 },
+  { name: 'portrait', width: 1080, height: 1920 },
   { name: 'square', width: 1400, height: 1400 }
 ];
 
@@ -41,7 +41,7 @@ async function run() {
 
     console.log('Starting layout generation...');
     const { convertNodes, getSimulation,getSubModuleColours } = await import('./layout-functions.mjs');
-
+    const {COLOR_SCALE_RANGE, NODE_RADIUS_RANGE} = await import('../constants.mjs')
     const __dirname = dirname(fileURLToPath(import.meta.url));
 
     const [convertedData] = await Promise.all([
@@ -61,22 +61,11 @@ async function run() {
     const subModuleNodes = nodesCopy.descendants().filter((f) => f.depth === 1);
     const subModuleNames = subModuleNodes.map((m) => m.data.id);
 
-    const colorRange = [
-      "#0072B2",
-      "#D55E00",
-      "#009E73",
-      "#CC79A7",
-      "#56B4E9",
-      "#F0E442",
-      "#999999",
-      "#E69F00",
-      "#64C4CD",
-      "#6A0DAD",
-      "#BADA55"];
+    const colorRange = COLOR_SCALE_RANGE;
     const colorScale = d3.scaleOrdinal().domain(subModuleNames).range(colorRange);
     console.log('color scale ok')
     const subModuleColors = getSubModuleColours(subModuleNames,colorScale);
-    const nodeRadiusRange = [3,30];
+    const nodeRadiusRange = NODE_RADIUS_RANGE
     const nodeRadiusScale = d3.scaleSqrt()
       .domain([0, d3.max(nodes, (d) => d.linkCount)])
       .range(nodeRadiusRange)
