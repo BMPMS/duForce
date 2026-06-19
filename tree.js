@@ -1,5 +1,5 @@
 import * as d3 from "d3";
-import { COLOR_SCALE_RANGE,  useDefaults } from "./constants";
+import { COLOR_SCALE_RANGE } from "./constants.mjs";
 import { config } from "./config";
 import {zoomToFit} from "./graph-d3";
 import ForceGraph from "./graph-d3";
@@ -455,7 +455,7 @@ export default function VariableTree(data) {
   }
 
   drawTree();
-  renderGraph(!useDefaults || config.graphDataType !== 'parameter',false);
+  renderGraph( config.graphDataType !== 'parameter',false);
 
   // finally, set various buttons
 

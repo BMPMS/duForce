@@ -1,7 +1,3 @@
-export const useDefaults = true;
-export const LINK_COLOR = "#C0C0C0";
-export const PARAMETER_CLUSTER_STRENGTH = 0.2;
-export const LINK_ARROW_COLOR = "#737373";
 export const COLOR_SCALE_RANGE = [
   "#0072B2",
   "#D55E00",
@@ -15,9 +11,15 @@ export const COLOR_SCALE_RANGE = [
   "#6A0DAD",
   "#BADA55"]
 
+export const NODE_RADIUS_RANGE = [3,30];
+export const LINK_COLOR = "#C0C0C0";
+export const PARAMETER_CLUSTER_STRENGTH = 0.2;
+export const LINK_ARROW_COLOR = "#737373";
+
+
 // node size range - always on a continuous scale based on the # of connections
 //export const NODE_RADIUS_RANGE = [1, 50];
-export const NODE_RADIUS_RANGE = [3,30];
+
 // keep them small for rendering (ie 1 to 50 is better than 15 to 100)
 // previous version (Sept 2025) was [6, 40];
 

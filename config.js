@@ -5,7 +5,7 @@ import {  LABEL_FONT_BASE_REM,
   NODE_RADIUS_RANGE,
   PARAMETER_CLUSTER_STRENGTH,
   RADIUS_COLLIDE_MULTIPLIER, SIMULATION_TICK_TIME,
-} from "./constants";
+} from "./constants.mjs";
 
 export const config = {
   // default settings
