@@ -9,14 +9,6 @@
 4. your new files (convertedData.json, defaultNodePositions_ x 3 (landscape, portrait, square) will be saved into the assests folder
 5. the old files will have been saved into the assets_backup folder
 
-NB: If the code changes the developer has to run 'npm run build' which overwrites the docs folder as follows
-
-This is what the docs folder should look like
-![Screenshot 2026-06-19 at 09.09.16.png](images%2FScreenshot%202026-06-19%20at%2009.09.16.png)
-
-The additional folder (duForce) which is used in the iFVars environment will be overwritten if you directly copy this folder across
-
-
 
 2. Running the app locally
 
@@ -37,25 +29,41 @@ npm run dev
 d) View the app on `http://localhost:5173/duForce`
 
 
-### Deployment
+### Build
+
+This really only applies if 
+* you are working on the app code
+* you've made changes to the app code
+* your are running the app (currently held Github/BMPMS/duForce) locally using npm run build
 
 1. Run the command below to build the app.
 ```
 npm run build
 ```
+2. push the changes to the server
 
 
-ADD HERE RE: pushing to main and Github Pages
+There are 3 assets files in the repo:
+* assets - this is the root data folder, new data should go here, running locally (npm run dev) the app will reference these files
+* docs/assets -  overwritten on build, build results - used by  BMPMS/duForce which hosts on Github Pages
+* docs/duForce/assets - overwritten on build, copy of build results - used by ifs-network-app which requires assets to be in a 'duForce' subfolder
 
-2. The build will be stored in 'dist' folder, which can then be uploaded into any development platform offering deployment services such as Netlify. Optional: You may view the build locally by running the server.
+### Copying changes across
 
-```
-node server.js
-```
+When the app has been changed and a new build has been created, the following files must be copied across to the ifs-network-app (and stable version when ready)
 
+* index.html
+* infoPanel.html
+* package.json
+* folders
+  * assets (only if data changes were made in BMPMS/duForce)
+  * chart_js
+  * dev_documentation (if recent changes)
+  * docs
+  * scripts
 
+There may be outlier circumstances where other files will change but that is the regular routine
 
-NOT SURE WHAT THIS IS OR IF IT IS STILL VALID?  (Bryony Mar 2026)
 ```
 node ./scripts/parse-db.js
 ```
