@@ -3,7 +3,7 @@ import { COLOR_SCALE_RANGE } from "./constants.mjs";
 import { config } from "./config";
 import {zoomToFit} from "./graph-d3";
 import ForceGraph from "./graph-d3";
-import { getSubModuleColours } from "./scripts/layout-functions.mjs";
+import { getSubModuleColours } from "../scripts/layout-functions.mjs";
 
 const mainAppContainerSelector = "#app";
 export const resetNodeHighlight = () => {

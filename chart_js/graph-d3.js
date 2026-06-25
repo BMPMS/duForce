@@ -3,7 +3,7 @@ import Graph from "graphology";
 import Fuse from 'fuse.js'
 import { config } from "./config";
 import { drawTree, getUrlId, remToPx, resetNodeHighlight } from "./tree";
-import {convertNodes,getSimulation} from "./scripts/layout-functions.mjs";
+import {convertNodes,getSimulation} from "../scripts/layout-functions.mjs";
 
 import {
   LINK_ARROW_COLOR,

@@ -41,7 +41,7 @@ async function run() {
 
     console.log('Starting layout generation...');
     const { convertNodes, getSimulation,getSubModuleColours } = await import('./layout-functions.mjs');
-    const {COLOR_SCALE_RANGE, NODE_RADIUS_RANGE} = await import('../constants.mjs')
+    const {COLOR_SCALE_RANGE, NODE_RADIUS_RANGE} = await import('../chart_js/constants.mjs')
     const __dirname = dirname(fileURLToPath(import.meta.url));
 
     const [convertedData] = await Promise.all([
