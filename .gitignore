@@ -3,5 +3,5 @@ dist/
 .env
 .idea
 server.js
-vite.config.js
+package-lock.json
 
