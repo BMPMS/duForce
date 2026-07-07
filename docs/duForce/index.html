@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    
+    <link href="https://fonts.googleapis.com/css?family=Lato:300,400,700&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css?family=Montserrat:400,800&display=swap" rel="stylesheet" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/js/all.min.js" crossorigin="anonymous"></script>
+    
+    <title>Graph Application</title>
+    <script type="module" crossorigin src="/duForce/assets/index-d0268f9d.js"></script>
+    <link rel="stylesheet" href="/duForce/assets/index-3dc78d80.css">
+  </head>
+  <body>
+    <!-- tooltipCount + info message (top left + middle if needed) -->
+    <div id="tooltipCountDiv">
+      <p><span id="downloadNNData"><i class="fa-solid fa-download"></i></span><span id="tooltipCount"></span></p>
+    </div>
+    <div id="infoMessage">There is no shortest path between the selected nodes</div>
+    <!-- zoom button menu bottom left -->
+    <div id="zoom-button-component">
+      <button class="zoom-button" id="zoom-to-fit">
+        <i class="fas fa-arrow-rotate-right"></i>
+      </button>
+      <button class="zoom-button" id="zoom-out">
+        <i class="fas fa-minus"></i>
+      </button>
+      <button class="zoom-button" id="zoom-in">
+        <i class="fas fa-plus"></i>
+      </button>
+    </div>
+    <!-- loading animation - centre screen when needed -->
+    <div class="animation-container">
+      <div class="loading-animation">
+        <h3>loading ...</h3>
+        <div class="nodes-pulse">
+          <div class="node"></div>
+          <div class="node"></div>
+          <div class="node"></div>
+          <div class="node"></div>
+          <div class="node"></div>
+          <div class="link" style="
+                    top: 45px;
+                    left: 80px;
+                    width: 50px;
+                    transform: rotate(120deg);
+                "></div>
+          <div class="link" style="
+                    top: 45px;
+                    left: 85px;
+                    width: 100px;
+                    transform: rotate(75deg);
+                "></div>
+          <div class="link" style="
+                    top: 85px;
+                    left: 65px;
+                    width: 100px;
+                    transform: rotate(22deg);
+                "></div>
+          <div class="link" style="
+                    top: 55px;
+                    left: 188px;
+                    width: 70px;
+                    transform: rotate(108deg);
+                "></div>
+        </div>
+      </div>
+    </div>
+    <!-- helpinfo panel, fixed bottom right above zoom buttons, only available on request -->
+    <div id="helpModalOverlay"></div>
+    <div id="helpInformationPanel"></div>
+    <div id="helpInfoButtonContainer" class="infoButtonContainer">
+      <button id="helpInfoCloseButton" class="infoCloseButton">x</button>
+    </div>
+    <div class="tooltip"></div>
+    <div class="tooltipExtra"></div>
+    <!-- main app container -->
+    <div id="app"></div>
+    <!-- container far right -->
+    <div id="search-tab-container">
+      <!-- data choice radio -->
+      <div id ="dataRadio">View:
+        <label><input type="radio" class="chartDataRadio" name="chartDataRadio" value="submodule" checked>Macro</label>
+          <label><input type="radio" class="chartDataRadio" name="chartDataRadio" value="segment">Meso</label>
+         <label><input type="radio" class="chartDataRadio" name="chartDataRadio" value="parameter">Variable</label>
+       </div>
+      <div id = "parameterRadio"> <input type="checkbox" id="viewParams" class="toggle-checkbox" checked>
+        <label for="viewParams">show Parameters</label></div>
+       <!-- parameter menu with - search input, nnDegreeDiv + buttons -->
+      <div id="parameter-menu">
+      <div id="search-container">
+        <input type="text" id="search-input" placeholder="Search for variables" />
+        <div id="suggestions-container"></div>
+      </div>
+        <p class="CTA">switch to <i class="fa-solid fa-arrow-up"></i><br>DEFAULT<br>to see results<br> on full graph</p>
+      <div id="shortestPathEndSearch">
+        <input type="text" id="search-input-sp-end" placeholder="Search for end node" />
+        <div id="suggestions-container-sp-end"></div>
+      </div>
+      <div id="nnDegreeDiv">
+        <label id="nnDegreeLabel" for="nnDegree">Degree</label>   <p id="nnDegreeValue1">1</p><p id="nnDegreeValue2">2</p><p id="nnDegreeValue3">3</p>
+        <input type="range" id="nnDegree" name="nnDegree" min="1" max="3" value="1" />
+      </div>
+        <!-- toolbar buttons and dropdown -->
+        <!--  <button class="toolbar-button" id="hide-single-button">
+            <i class="fas fa-user-ninja"></i>
+          </button> -->
+          <button class="toolbar-button" id="layout-button">
+            <i class="fas fa-circle-nodes"></i>
+          </button>
+          <div class="dropdown-menu">
+            <button class="dropdown-item" id="default"><i class="fas fa-circle-nodes"></i><span class="dropdown-span">Default</span></button>
+            <button class="dropdown-item" id="shortestPath"><i class="fas fa-wave-square"></i><span class="dropdown-span">Shortest Path</span></button>
+            <button class="dropdown-item" id="nearestNeighbour"><i class="fas fa-house-user"></i><span class="dropdown-span">Nearest Neighbour</span></button>
+          </div>
+           </div>
+          <!-- help, download, reset + show/view menu buttons -->
+        <p class="otherButton" id="helpInfo"><i class="fa-solid fa-circle-info"></i></p>
+        <p class="otherButton" id="downloadImage"><i class="fa-solid fa-circle-down"></i></p>
+        <p  id="resetButton">Reset</p>
+
+        <div id="collapsibleMenuToggle">
+          <p class="viewButton" id="showInfo">Show interactive menu</p>
+          <p class="viewButton" id="hideInfo">Hide interactive menu</p>
+        </div>
+
+      
+      <!-- container far right -->
+      <div id="collapsibleMenuContainer">
+        <div>
+          <p  id="unselectAll">Unselect All</p>
+        </div>
+        <!-- collapsible menu tree container -->
+        <div  id="collapsibleMenuDiv"></div>
+    </div>
+    </div>
+
+    <script>
+
+      // script for layout and hide/show buttons
+      document.getElementById('layout-button').addEventListener('click', function(event) {
+        event.stopPropagation();
+        let menu = document.querySelector('.dropdown-menu');
+        menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
+      });
+
+      document.addEventListener('click', function() {
+        document.querySelector('.dropdown-menu').style.display = 'none';
+      });
+
+
+    </script>
+  </body>
+</html>
