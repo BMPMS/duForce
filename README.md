@@ -16,11 +16,6 @@ npm run rebuild-data
 5. the old files will have been saved into the assets_backup folder
 6. now enter the following into the terminal and click return
 
-```
-npm run build
-```
-NB: Step 6 is crucial, it copies all the required files to the right place so the app works locally in both environments AND on the server ifs-network-app 
-
 ### Running the app locally
 
 
@@ -67,17 +62,8 @@ These will all be created correctly when you run the build command
 
 When the app has been changed and a new build has been created, the following files must be copied across to the ifs-network-app (and stable version when ready)
 
-* index.html
-* infoPanel.html
-* package.json
-* entire folders
-  * assets (only if data changes were made in BMPMS/duForce)
-  * chart_js
-  * dev_documentation (if recent changes)
-  * docs
-  * scripts
+1. Copy the entire repo across to ifs-network-app 
 
-There may be outlier circumstances where other files will change but that is the regular routine
 
 ```
 node ./scripts/parse-db.js

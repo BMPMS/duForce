@@ -43,8 +43,9 @@ const getHierarchy = (nodes) => {
       const entrySplit = entry.split("-");
       const parent = `submodule-${entrySplit[2]}`;
       const segmentId =`segment-${entrySplit[0]}`
+      const matchingPrevious = acc.find((f) => f.id === segmentId);
       // filtering out duplicates for the demo
-      if(!acc.some((f) => f.id === segmentId)) {
+      if(!matchingPrevious) {
         acc.push( {
           id: segmentId,
           subModule: parent,
@@ -53,7 +54,8 @@ const getHierarchy = (nodes) => {
           type: "tier2",
         });
       } else {
-        console.error(`${segmentId} with submodule ${parent} is being filtered out as this segmentId has been used previously with a different Segment Name`)
+        const previousEntry = `id: ${matchingPrevious.id}, subModule: ${matchingPrevious.subModule}, parent: ${matchingPrevious.parent}, NAME: ${matchingPrevious.NAME}`;
+        console.error(`id: ${segmentId} with submodule ${parent}, name ${entrySplit[1]} is being filtered out as this segmentId has been used previously with a different Segment Name.  Previous entry is ${previousEntry}`)
       }
       return acc;
     },[])
